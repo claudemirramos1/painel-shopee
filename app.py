@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import json
 from gtts import gTTS
-from PIL import Image, ImageOps, ImageEnhance, ImageFilter
+from PIL import Image, ImageOps, ImageEnhance
 import io
 
 # ==========================================
@@ -23,38 +23,40 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🛍️ Painel de Automação de Ofertas com Tela Cheia no Facebook")
-st.markdown("Publique ofertas com imagens ajustadas em tela cheia e alta nitidez para o Feed do Facebook.")
+st.title("🛍️ Painel de Automação de Ofertas com Otimização Automática de Imagem")
+st.markdown("Publique ofertas com fotos redimensionadas em tela cheia (1080x1350) e tratadas automaticamente para máxima nitidez no Facebook e Telegram.")
 
 # ==========================================
-# FUNÇÃO DE OTIMIZAÇÃO E MELHORIA DE QUALIDADE (100% GRATUITA)
+# FUNÇÃO DE PROCESSAMENTO AUTOMÁTICO ROBUSTO
 # ==========================================
-def otimizar_e_melhorar_imagem(imagem_upload, target_size=(1080, 1350)):
+def processar_imagem_automaticamente(imagem_upload, target_size=(1080, 1350)):
     """
-    Ajusta a imagem para tela cheia (1080x1350) sem bordas e aplica 
-    filtros inteligentes de nitidez, contraste e saturação para valorizar o produto.
+    Processa a imagem de forma integrada:
+    1. Converte para RGB com segurança.
+    2. Ajusta para o formato vertical ideal de feed do Facebook (1080x1350) sem bordas (Crop centralizado).
+    3. Aplica camadas de nitidez e realce de contraste de alta performance para valorizar o produto.
     """
     try:
         img = Image.open(imagem_upload)
         if img.mode in ("RGBA", "P"):
             img = img.convert("RGB")
             
-        # 1. Redimensionamento e corte inteligente centralizado (sem bordas brancas)
+        # 1. Ajuste de proporção e preenchimento total de tela (Feed Vertical 4:5)
         img_ajustada = ImageOps.fit(img, target_size, method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
         
-        # 2. Aumento profissional de Nitidez (Deixa o texto e detalhes do produto nítidos)
+        # 2. Realce de Nitidez Avançado (Elimina aspecto lavado/borrado)
         enhancer_sharpness = ImageEnhance.Sharpness(img_ajustada)
-        img_nitida = enhancer_sharpness.enhance(1.6) # Aumenta a nitidez em 60%
+        img_nitida = enhancer_sharpness.enhance(1.8) # Aumento calibrado de nitidez
         
-        # 3. Leve realce de Contraste para destacar o produto no feed
+        # 3. Realce de Contraste e Cor para destacar o produto no feed
         enhancer_contrast = ImageEnhance.Contrast(img_nitida)
-        img_final = enhancer_contrast.enhance(1.1)
+        img_final = enhancer_contrast.enhance(1.15)
         
         output_buffer = io.BytesIO()
         img_final.save(output_buffer, format="JPEG", quality=95)
         output_buffer.seek(0)
         
-        output_buffer.name = "imagem_otimizada_hd.jpg"
+        output_buffer.name = "oferta_otimizada_hd.jpg"
         output_buffer.type = "image/jpeg"
         return output_buffer
     except Exception as e:
@@ -121,10 +123,10 @@ def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta
     try:
         legenda_limpa = texto_fb.replace("<b>", "").replace("</b>", "").replace("<code>", "").replace("</code>", "")
         
-        # Aplica a otimização de tela cheia + alta nitidez gratuita em cada imagem
-        imagens_otimizadas = [otimizar_e_melhorar_imagem(img) for img in lista_imagens] if lista_imagens else []
+        # Processamento automático integrado de cada imagem enviada
+        imagens_processadas = [processar_imagem_automaticamente(img) for img in lista_imagens] if lista_imagens else []
         
-        if not imagens_otimizadas or len(imagens_otimizadas) == 0:
+        if not imagens_processadas or len(imagens_processadas) == 0:
             url = f"https://graph.facebook.com/v26.0/{page_id}/feed"
             payload = {"message": legenda_limpa, "access_token": page_token}
             if link_oferta and link_oferta.strip():
@@ -133,19 +135,19 @@ def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta
             res_data = response.json()
             return (True, "Publicado no Facebook!") if ("id" in res_data or "post_id" in res_data) else (False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro')}")
 
-        elif len(imagens_otimizadas) == 1:
-            img = imagens_otimizadas[0]
+        elif len(imagens_processadas) == 1:
+            img = imagens_processadas[0]
             img.seek(0)
             url = f"https://graph.facebook.com/v26.0/{page_id}/photos"
             files = {"source": (img.name, img.getvalue(), img.type)}
             payload = {"caption": legenda_limpa, "access_token": page_token}
             response = requests.post(url, data=payload, files=files, timeout=30)
             res_data = response.json()
-            return (True, "Publicado no Facebook com foto em tela cheia e alta nitidez!") if ("id" in res_data or "post_id" in res_data) else (False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro')}")
+            return (True, "Publicado no Facebook com imagem otimizada em tela cheia!") if ("id" in res_data or "post_id" in res_data) else (False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro')}")
 
         else:
             attached_media_list = []
-            for img in imagens_otimizadas:
+            for img in imagens_processadas:
                 img.seek(0)
                 url_upload = f"https://graph.facebook.com/v26.0/{page_id}/photos"
                 files = {"source": (img.name, img.getvalue(), img.type)}
@@ -165,7 +167,7 @@ def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta
             }
             response = requests.post(url_feed, data=payload_feed, timeout=30)
             res_data = response.json()
-            return (True, "Álbum publicado no Facebook com fotos em tela cheia e alta nitidez!") if ("id" in res_data or "post_id" in res_data) else (False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro')}")
+            return (True, "Álbum publicado no Facebook com imagens otimizadas em tela cheia!") if ("id" in res_data or "post_id" in res_data) else (False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro')}")
 
     except Exception as e:
         return False, f"Falha no Facebook: {str(e)}"
@@ -223,7 +225,7 @@ with tab_redes:
     st.markdown("### 🎯 Selecione os Destinos")
     col_check1, col_check2 = st.columns(2)
     with col_check1:
-        enviar_fb = st.checkbox("Facebook Page (Tela Cheia & Alta Nitidez)", value=True)
+        enviar_fb = st.checkbox("Facebook Page (Com Tratamento Automático HD)", value=True)
     with col_check2:
         enviar_tg = st.checkbox("Telegram", value=True)
 
@@ -232,7 +234,7 @@ with tab_redes:
         if not titulo_produto and not link_afiliado:
             st.warning("Preencha ao menos o Título e o Link do produto antes de postar.")
         else:
-            st.info("Ajustando imagem em tela cheia e aplicando melhoria de nitidez...")
+            st.info("Processando imagens automaticamente (Nitidez + Tela Cheia) e enviando...")
             if enviar_fb:
                 st_fb, msg_fb = postar_no_facebook(FB_PAGE_ID_FIXO, FB_PAGE_TOKEN_FIXO, texto_gerado, imagens_upload, link_afiliado)
                 if st_fb:
@@ -270,4 +272,4 @@ with tab_roteiro_locucao:
                         data=f,
                         file_name="locucao_oferta.mp3",
                         mime="audio/mp3"
-    )
+                    )
