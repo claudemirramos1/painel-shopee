@@ -262,7 +262,7 @@ def postar_no_facebook(
 
 
 # ==========================================
-# INTERFACE DA APLICAÇÃO (LAYOUT EM 2 COLUNAS)
+# INTERFACE DA APLICAÇÃO (FORMULÁRIO ALINHADO)
 # ==========================================
 st.subheader("📝 Preencher Dados da Oferta")
 
@@ -271,18 +271,34 @@ if "preco_por_val" not in st.session_state:
 if "obs_val" not in st.session_state:
   st.session_state.obs_val = ""
 
-# DUAS COLUNAS PRINCIPAIS LADO A LADO
-col_esquerda, col_direita = st.columns([1, 1])
-
-# --- COLUNA DA ESQUERDA (PREÇOS, DESCONTOS E CUPOM) ---
-with col_esquerda:
+# --- LINHA 1: TÍTULO E LINK ---
+col1_left, col1_right = st.columns(2)
+with col1_left:
   titulo_produto = st.text_input(
       "Título do Produto", placeholder='Ex: Smart TV 55" 4K'
   )
-  preco_de = st.text_input("Preço De (R$)", placeholder="Ex: 1000")
+with col1_right:
+  link_afiliado = st.text_input(
+      "Link da Oferta / Afiliado", placeholder="https://..."
+  )
 
-  # DESCONTOS RÁPIDOS NA ESQUERDA
-  st.caption("⚡ Desconto Rápido:")
+# --- LINHA 2: PREÇO DE E PREÇO POR ---
+col2_left, col2_right = st.columns(2)
+with col2_left:
+  preco_de = st.text_input("Preço De (R$)", placeholder="Ex: 1000")
+with col2_right:
+  preco_por = st.text_input(
+      "Preço Por (R$)",
+      value=st.session_state.preco_por_val,
+      placeholder="Ex: 800",
+  )
+
+# --- LINHA 3: PAINEL DE BOTÕES RÁPIDOS LADO A LADO ---
+col3_left, col3_right = st.columns(2)
+
+# Esquerda: Descontos
+with col3_left:
+  st.caption("⚡ Cálculo Rápido de Desconto:")
   cd1, cd2, cd3, cd4, cd5 = st.columns(5)
 
 
@@ -308,20 +324,8 @@ with col_esquerda:
   if cd5.button("Limpar"):
     st.session_state.preco_por_val = ""
 
-  preco_por = st.text_input(
-      "Preço Por (R$)",
-      value=st.session_state.preco_por_val,
-      placeholder="Ex: 800",
-  )
-  cupom = st.text_input("Cupom de Desconto (Opcional)", placeholder="Ex: DESCONTO10")
-
-# --- COLUNA DA DIREITA (LINK, ETIQUETAS, OBS E IMAGENS) ---
-with col_direita:
-  link_afiliado = st.text_input(
-      "Link da Oferta / Afiliado", placeholder="https://..."
-  )
-
-  # ETIQUETAS RÁPIDAS NA DIREITA
+# Direita: Etiquetas
+with col3_right:
   st.caption("📌 Etiquetas Rápida:")
   ct1, ct2, ct3 = st.columns(3)
 
@@ -341,24 +345,30 @@ with col_direita:
   if ct3.button("⭐ Do Dia"):
     adicionar_tag("⭐ Oferta do Dia")
 
+# --- LINHA 4: CUPOM E OBSERVAÇÕES ---
+col4_left, col4_right = st.columns(2)
+with col4_left:
+  cupom = st.text_input("Cupom de Desconto (Opcional)", placeholder="Ex: DESCONTO10")
+with col4_right:
   descricao_extra = st.text_area(
       "Observações (Opcional)", value=st.session_state.obs_val, height=68
   )
 
-  imagens_upload = st.file_uploader(
-      "📸 Selecionar Imagens da Galeria",
-      type=["jpg", "jpeg", "png", "webp"],
-      accept_multiple_files=True,
-      key="uploader_fotos_galeria",
-  )
+# --- LINHA 5: UPLOAD DE FOTOS (LARGURA TOTAL) ---
+imagens_upload = st.file_uploader(
+    "📸 Selecionar Imagens da Galeria",
+    type=["jpg", "jpeg", "png", "webp"],
+    accept_multiple_files=True,
+    key="uploader_fotos_galeria",
+)
 
-  if imagens_upload:
-    st.info(f"📷 {len(imagens_upload)} imagem(ns) selecionada(s)!")
-    cols_img = st.columns(min(len(imagens_upload), 4))
-    for idx, img_item in enumerate(imagens_upload):
-      cols_img[idx % 4].image(
-          img_item, caption=f"Foto {idx+1}", use_container_width=True
-      )
+if imagens_upload:
+  st.info(f"📷 {len(imagens_upload)} imagem(ns) selecionada(s)!")
+  cols_img = st.columns(min(len(imagens_upload), 4))
+  for idx, img_item in enumerate(imagens_upload):
+    cols_img[idx % 4].image(
+        img_item, caption=f"Foto {idx+1}", use_container_width=True
+    )
 
 st.markdown("---")
 
@@ -502,4 +512,4 @@ with col_btn2:
       </a>
       """,
       unsafe_allow_html=True,
-    )       
+    )
