@@ -1,7 +1,5 @@
 import io
 import json
-import urllib.parse
-from gtts import gTTS
 from PIL import Image, ImageEnhance, ImageOps
 import requests
 import streamlit as st
@@ -18,18 +16,18 @@ TELEGRAM_CHAT_ID_FIXO = "-1004406728710"
 st.set_page_config(
     page_title="Painel de Ofertas & Redes Sociais", page_icon="🛍️", layout="wide"
 )
+
 st.title(
     "🛍️ Painel de Automação de Ofertas com Múltiplas Fotos & Alta Resolução"
 )
 
 
 # ==========================================
-# PROCESSAMENTO SEGURO DE MEMÓRIA
+# PROCESSAMENTO DE IMAGEM VIA BUFFER SEGURO
 # ==========================================
 def processar_imagem_segura(imagem_upload, target_size=(1080, 1350)):
-  """Lê os bytes da foto em um buffer totalmente novo em memória."""
+  """Lê os bytes da foto em um buffer em memória para não perder a referência no Streamlit."""
   try:
-    # Cria uma cópia independente dos bytes do upload
     bytes_data = imagem_upload.getvalue()
     input_buffer = io.BytesIO(bytes_data)
 
@@ -132,7 +130,7 @@ def postar_no_telegram(token, chat_id, texto, lista_imagens):
 
 
 # ==========================================
-# ENVIO FACEBOOK (ÁLBUM / MULTI-UPLOAD)
+# ENVIO FACEBOOK (MULTIPLICIDADE / CARROSSEL)
 # ==========================================
 def postar_no_facebook(
     page_id, page_token, texto_fb, lista_imagens, link_oferta=None
@@ -190,7 +188,6 @@ def postar_no_facebook(
 
     else:
       attached_media_list = []
-      # Sobe cada foto individualmente sem publicar (published=false) para depois criar o post combinado
       for idx, img in enumerate(imagens_processadas):
         url_upload = f"https://graph.facebook.com/v26.0/{page_id}/photos"
         files = {"source": (f"foto_{idx}.jpg", img.getvalue(), "image/jpeg")}
@@ -239,7 +236,7 @@ def postar_no_facebook(
 
 
 # ==========================================
-# INTERFACE
+# INTERFACE DA APLICAÇÃO (COM SESSION STATE FIX)
 # ==========================================
 st.subheader("📝 Preencher Dados da Oferta")
 col1, col2 = st.columns([1, 1])
@@ -256,24 +253,27 @@ with col2:
   link_afiliado = st.text_input(
       "Link da Oferta / Afiliado", placeholder="https://..."
   )
+
+  # FILE UPLOADER COM KEY E LIMITE CORRIGIDOS
   imagens_upload = st.file_uploader(
       "📸 Selecionar Imagens da Galeria",
       type=["jpg", "jpeg", "png", "webp"],
       accept_multiple_files=True,
+      key="uploader_fotos_galeria",
+      max_upload_size=500,
   )
 
   if imagens_upload:
-    st.info(f"📷 {len(imagens_upload)} imagem(ns) carregada(s) com sucesso!")
+    st.info(f"📷 {len(imagens_upload)} imagem(ns) selecionada(s)!")
     cols_img = st.columns(min(len(imagens_upload), 4))
     for idx, img_item in enumerate(imagens_upload):
       cols_img[idx % 4].image(
-          img_item,
-          caption=f"Foto {idx+1}",
-          use_container_width=True,
+          img_item, caption=f"Foto {idx+1}", use_container_width=True
       )
 
 descricao_extra = st.text_area("Observações (Opcional)", height=70)
 
+# Montagem do texto final
 texto_gerado = (
     f"🔥 <b>{titulo_produto if titulo_produto else 'OFERTA IMPERDÍVEL'}</b>\n\n"
 )
