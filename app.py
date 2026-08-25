@@ -4,11 +4,13 @@ import json
 import os
 from gtts import gTTS
 
-# Importações seguras do MoviePy para evitar erros no Streamlit Cloud
-from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
-from moviepy.audio.io.AudioFileClip import AudioFileClip
-from moviepy.video.compositing.concatenate import concatenate_videoclips
-from moviepy.video.VideoClip import ImageClip
+# Importação padrão robusta do MoviePy
+try:
+    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
+except ImportError:
+    from moviepy.video.VideoClip import ImageClip
+    from moviepy.audio.io.AudioFileClip import AudioFileClip
+    from moviepy.video.compositing.concatenate import concatenate_videoclips
 
 # ==========================================
 # CONFIGURAÇÕES FIXAS
