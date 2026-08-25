@@ -18,14 +18,27 @@ st.markdown("Crie promoções completas e publique no Facebook, Telegram e Whats
 # ==========================================
 st.sidebar.header("⚙️ Configurações das APIs")
 
-# Telegram
+# Telegram (Configurado com seus dados)
 st.sidebar.subheader("Telegram")
-telegram_bot_token = st.sidebar.text_input("Bot Token (Telegram)", type="password", key="tg_token")
-telegram_chat_id = st.sidebar.text_input("Chat ID / Canal (Telegram)", key="tg_chat_id")
+telegram_bot_token = st.sidebar.text_input(
+    "Bot Token (Telegram)", 
+    value="8353706833:AAHhyPqgeNezFY1X4NTMegpaPf_UdVOBs04", 
+    type="password", 
+    key="tg_token"
+)
+telegram_chat_id = st.sidebar.text_input(
+    "Chat ID / Canal (Telegram)", 
+    value="-1004406728710", 
+    key="tg_chat_id"
+)
 
 # Facebook Page (Configurado com seus dados da PromoMania)
 st.sidebar.subheader("Facebook Page")
-fb_page_id = st.sidebar.text_input("ID da Página FB", value="1283510278175598", key="fb_page_id")
+fb_page_id = st.sidebar.text_input(
+    "ID da Página FB", 
+    value="1283510278175598", 
+    key="fb_page_id"
+)
 fb_page_token = st.sidebar.text_input(
     "Token da Página FB", 
     value="EAAPZAdxais7gBSUWxZCSGOBmtoW0Ni1jiVl7XV2uNY9kdm8vOs9FA0RZB7Y6a8pQGqjeTv2aFKplqMLCHw5oQwIW8HRZCRFroZC36qR3KhkMTer4TkFEeWjSZATj5mft7tZCHWcB0L6NHUkWcYfOZBDmmPPimz9KWqiZA8cyvPGOw5Y5cm15tbpU98hmjZA5MkxbCACVrOmnb9GWvjgseBxWMBgEhFsJdXahcSEHjOzWcY0p7z", 
@@ -35,62 +48,88 @@ fb_page_token = st.sidebar.text_input(
 
 # WhatsApp
 st.sidebar.subheader("WhatsApp")
-wsp_webhook_url = st.sidebar.text_input("URL do Webhook / API WhatsApp", key="wsp_url", placeholder="https://sua-api-whatsapp.com/send")
+wsp_webhook_url = st.sidebar.text_input(
+    "URL do Webhook / API WhatsApp", 
+    key="wsp_url", 
+    placeholder="https://sua-api-whatsapp.com/send"
+)
 
 # ==========================================
 # FUNÇÕES DE ENVIO
 # ==========================================
 
-def postar_no_telegram(token, chat_id, texto, arquivo_imagem):
+def postar_no_telegram(token, chat_id, texto, lista_imagens):
     if not token or not chat_id:
         return False, "Token ou Chat ID do Telegram não informados."
     try:
-        if arquivo_imagem:
-            arquivo_imagem.seek(0)
+        if lista_imagens and len(lista_imagens) == 1:
+            # Envio de apenas 1 Imagem
+            img = lista_imagens[0]
+            img.seek(0)
             url = f"https://api.telegram.org/bot{token}/sendPhoto"
-            files = {"photo": (arquivo_imagem.name, arquivo_imagem.getvalue(), arquivo_imagem.type)}
+            files = {"photo": (img.name, img.getvalue(), img.type)}
             data = {"chat_id": chat_id, "caption": texto, "parse_mode": "HTML"}
             response = requests.post(url, data=data, files=files, timeout=20)
+            res_data = response.json()
+            return (True, "Publicado no Telegram!") if res_data.get("ok") else (False, f"Erro Telegram: {res_data.get('description')}")
+        
+        elif lista_imagens and len(lista_imagens) > 1:
+            # Envio de Álbum (Múltiplas Imagens)
+            url = f"https://api.telegram.org/bot{token}/sendMediaGroup"
+            media = []
+            files = {}
+            for idx, img in enumerate(lista_imagens):
+                img.seek(0)
+                file_key = f"photo_{idx}"
+                files[file_key] = (img.name, img.getvalue(), img.type)
+                item = {
+                    "type": "photo",
+                    "media": f"attach://{file_key}"
+                }
+                if idx == 0:
+                    item["caption"] = texto
+                    item["parse_mode"] = "HTML"
+                media.append(item)
+            
+            data = {
+                "chat_id": chat_id,
+                "media": requests.compat.json.dumps(media)
+            }
+            response = requests.post(url, data=data, files=files, timeout=30)
+            res_data = response.json()
+            return (True, "Álbum publicado no Telegram!") if res_data.get("ok") else (False, f"Erro Telegram: {res_data.get('description')}")
+        
         else:
+            # Apenas Texto
             url = f"https://api.telegram.org/bot{token}/sendMessage"
             data = {"chat_id": chat_id, "text": texto, "parse_mode": "HTML"}
             response = requests.post(url, data=data, timeout=10)
-        
-        res_data = response.json()
-        return (True, "Publicado no Telegram!") if res_data.get("ok") else (False, f"Erro Telegram: {res_data.get('description')}")
+            res_data = response.json()
+            return (True, "Publicado no Telegram!") if res_data.get("ok") else (False, f"Erro Telegram: {res_data.get('description')}")
+
     except Exception as e:
         return False, f"Falha no Telegram: {str(e)}"
 
 
-def postar_no_facebook(page_id, page_token, texto_fb, arquivo_imagem):
+def postar_no_facebook(page_id, page_token, texto_fb, link_oferta=None):
     if not page_id or not page_token:
         return False, "ID da Página ou Token de Acesso do FB não informados."
     try:
-        # Remove caracteres markdown que causam erros de sintaxe no Graph API
         legenda_limpa = texto_fb.replace("**", "").replace("`", "")
-
-        if arquivo_imagem:
-            arquivo_imagem.seek(0)
-            url = f"https://graph.facebook.com/v26.0/{page_id}/photos"
-            files = {
-                "source": (arquivo_imagem.name, arquivo_imagem.getvalue(), arquivo_imagem.type)
-            }
-            params = {
-                "caption": legenda_limpa,
-                "access_token": page_token
-            }
-            response = requests.post(url, params=params, files=files, timeout=30)
-        else:
-            url = f"https://graph.facebook.com/v26.0/{page_id}/feed"
-            payload = {
-                "message": legenda_limpa,
-                "access_token": page_token
-            }
-            response = requests.post(url, data=payload, timeout=15)
+        url = f"https://graph.facebook.com/v26.0/{page_id}/feed"
+        
+        payload = {
+            "message": legenda_limpa,
+            "access_token": page_token
+        }
+        if link_oferta and link_oferta.strip():
+            payload["link"] = link_oferta.strip()
             
+        response = requests.post(url, data=payload, timeout=15)
         res_data = response.json()
+        
         if "id" in res_data or "post_id" in res_data:
-            return True, "Publicado com sucesso na Página do Facebook!"
+            return True, "Publicado no Facebook!"
         else:
             err = res_data.get("error", {})
             return False, f"Erro Facebook: {err.get('message', 'Erro desconhecido')}"
@@ -127,27 +166,34 @@ with col1:
 
 with col2:
     link_afiliado = st.text_input("Link da Oferta / Afiliado", placeholder="https://...")
-    imagem_upload = st.file_uploader(
-        "📸 Selecionar Imagem da Galeria", 
-        type=["jpg", "jpeg", "png", "webp"]
+    
+    # Habilitado para selecionar MÚLTIPLAS imagens da galeria
+    imagens_upload = st.file_uploader(
+        "📸 Selecionar Imagens da Galeria (Pode escolher várias)", 
+        type=["jpg", "jpeg", "png", "webp"],
+        accept_multiple_files=True
     )
-    if imagem_upload:
-        st.image(imagem_upload, caption="Pré-visualização da imagem", width=150)
+    
+    if imagens_upload:
+        st.write(f"📷 {len(imagens_upload)} imagem(ns) selecionada(s)")
+        cols_img = st.columns(min(len(imagens_upload), 4))
+        for idx, img in enumerate(imagens_upload):
+            cols_img[idx % 4].image(img, use_column_width=True)
 
 descricao_extra = st.text_area("Observações / Detalhes Adicionais (Opcional)", placeholder="Ex: Frete Grátis para assinantes Prime", height=70)
 
-# Montagem das versões de texto
-texto_gerado = f"🔥 **{titulo_produto if titulo_produto else 'OFERTA IMPERDÍVEL'}**\n\n"
+# Montagem do texto das publicações
+texto_gerado = f"🔥 <b>{titulo_produto if titulo_produto else 'OFERTA IMPERDÍVEL'}</b>\n\n"
 if preco_de:
     texto_gerado += f"❌ De: R$ {preco_de}\n"
 if preco_por:
-    texto_gerado += f"✅ **Por: R$ {preco_por}**\n"
+    texto_gerado += f"✅ <b>Por: R$ {preco_por}</b>\n"
 if cupom:
-    texto_gerado += f"🎟️ Cupom: `{cupom}`\n"
+    texto_gerado += f"🎟️ Cupom: <code>{cupom}</code>\n"
 if descricao_extra:
     texto_gerado += f"\nℹ️ {descricao_extra}\n"
 if link_afiliado:
-    texto_gerado += f"\n🛒 **Compre Aqui:** {link_afiliado}"
+    texto_gerado += f"\n🛒 <b>Compre Aqui:</b> {link_afiliado}"
 
 st.markdown("---")
 st.subheader("👀 Pré-visualização da Mensagem")
@@ -172,17 +218,17 @@ if st.button("🚀 Postar Oferta em Todos os Canais", type="primary", use_contai
     else:
         st.info("Enviando publicações...")
         
-        # Facebook
+        # Facebook (Publicação via Feed com Preview de Link)
         if enviar_fb:
-            st_fb, msg_fb = postar_no_facebook(fb_page_id, fb_page_token, texto_gerado, imagem_upload)
+            st_fb, msg_fb = postar_no_facebook(fb_page_id, fb_page_token, texto_gerado, link_afiliado)
             if st_fb:
                 st.success(f"✅ **Facebook:** {msg_fb}")
             else:
                 st.error(f"❌ **Facebook:** {msg_fb}")
                 
-        # Telegram
+        # Telegram (Upload de 1 imagem ou álbum com múltiplas fotos)
         if enviar_tg:
-            st_tg, msg_tg = postar_no_telegram(telegram_bot_token, telegram_chat_id, texto_gerado, imagem_upload)
+            st_tg, msg_tg = postar_no_telegram(telegram_bot_token, telegram_chat_id, texto_gerado, imagens_upload)
             if st_tg:
                 st.success(f"✅ **Telegram:** {msg_tg}")
             else:
