@@ -68,13 +68,11 @@ def processar_imagem_automaticamente(imagem_upload, target_size=(1080, 1350)):
 
 
 # ==========================================
-# FUNÇÕES DE INTEGRACÃO E REDES SOCIAIS
+# FUNÇÕES DE REDES SOCIAIS & WHATSAPP
 # ==========================================
 
 
 def gerar_link_whatsapp(texto, numero_telefone=""):
-  """Gera um link wa.me/api.whatsapp formatado com a oferta."""
-  # Limpa tags HTML para o formato do WhatsApp (*negrito*, ~riscado~, ```código```)
   texto_wa = (
       texto.replace("<b>", "*")
       .replace("</b>", "*")
@@ -94,16 +92,19 @@ def postar_no_telegram(token, chat_id, texto, lista_imagens):
   if not token or not chat_id:
     return False, "Token ou Chat ID do Telegram não informados."
   try:
-    imagens_processadas = (
-        [processar_imagem_automaticamente(img) for img in lista_imagens]
-        if lista_imagens
-        else []
-    )
+    # Garante o resete de ponteiro para TODAS as imagens selecionadas
+    imagens_processadas = []
+    if lista_imagens:
+      for img_raw in lista_imagens:
+        if hasattr(img_raw, "seek"):
+          img_raw.seek(0)
+        img_proc = processar_imagem_automaticamente(img_raw)
+        imagens_processadas.append(img_proc)
 
     if not imagens_processadas or len(imagens_processadas) == 0:
       url = f"https://api.telegram.org/bot{token}/sendMessage"
       data = {"chat_id": chat_id, "text": texto, "parse_mode": "HTML"}
-      response = requests.post(url, data=data, timeout=10)
+      response = requests.post(url, data=data, timeout=15)
       res_data = response.json()
       return (
           (True, "Publicado no Telegram!")
@@ -117,7 +118,7 @@ def postar_no_telegram(token, chat_id, texto, lista_imagens):
       url = f"https://api.telegram.org/bot{token}/sendPhoto"
       files = {"photo": (img.name, img.getvalue(), img.type)}
       data = {"chat_id": chat_id, "caption": texto, "parse_mode": "HTML"}
-      response = requests.post(url, data=data, files=files, timeout=20)
+      response = requests.post(url, data=data, files=files, timeout=30)
       res_data = response.json()
       return (
           (True, "Publicado no Telegram!")
@@ -140,10 +141,16 @@ def postar_no_telegram(token, chat_id, texto, lista_imagens):
         media.append(item)
 
       data = {"chat_id": chat_id, "media": json.dumps(media)}
-      response = requests.post(url, data=data, files=files, timeout=30)
+      response = requests.post(url, data=data, files=files, timeout=60)
       res_data = response.json()
       return (
-          (True, "Álbum com múltiplas fotos publicado no Telegram!")
+          (
+              True,
+              (
+                  f"Álbum com {len(imagens_processadas)} fotos publicado no"
+                  " Telegram!"
+              ),
+          )
           if res_data.get("ok")
           else (False, f"Erro Telegram: {res_data.get('description')}")
       )
@@ -164,18 +171,21 @@ def postar_no_facebook(
         .replace("<code>", "")
         .replace("</code>", "")
     )
-    imagens_processadas = (
-        [processar_imagem_automaticamente(img) for img in lista_imagens]
-        if lista_imagens
-        else []
-    )
+
+    imagens_processadas = []
+    if lista_imagens:
+      for img_raw in lista_imagens:
+        if hasattr(img_raw, "seek"):
+          img_raw.seek(0)
+        img_proc = processar_imagem_automaticamente(img_raw)
+        imagens_processadas.append(img_proc)
 
     if not imagens_processadas or len(imagens_processadas) == 0:
       url = f"https://graph.facebook.com/v26.0/{page_id}/feed"
       payload = {"message": legenda_limpa, "access_token": page_token}
       if link_oferta and link_oferta.strip():
         payload["link"] = link_oferta.strip()
-      response = requests.post(url, data=payload, timeout=15)
+      response = requests.post(url, data=payload, timeout=20)
       res_data = response.json()
       return (
           (True, "Publicado no Facebook!")
@@ -194,7 +204,7 @@ def postar_no_facebook(
       payload = {"caption": legenda_limpa, "access_token": page_token}
       if link_oferta and link_oferta.strip():
         payload["link"] = link_oferta.strip()
-      response = requests.post(url, data=payload, files=files, timeout=30)
+      response = requests.post(url, data=payload, files=files, timeout=40)
       res_data = response.json()
       return (
           (True, "Publicado no Facebook com foto em alta resolução!")
@@ -207,13 +217,13 @@ def postar_no_facebook(
 
     else:
       attached_media_list = []
-      for img in imagens_processadas:
+      for idx, img in enumerate(imagens_processadas):
         img.seek(0)
         url_upload = f"https://graph.facebook.com/v26.0/{page_id}/photos"
-        files = {"source": (img.name, img.getvalue(), img.type)}
+        files = {"source": (f"foto_{idx}.jpg", img.getvalue(), "image/jpeg")}
         payload_upload = {"published": "false", "access_token": page_token}
         resp_upload = requests.post(
-            url_upload, data=payload_upload, files=files, timeout=30
+            url_upload, data=payload_upload, files=files, timeout=40
         )
         data_upload = resp_upload.json()
         if "id" in data_upload:
@@ -221,7 +231,7 @@ def postar_no_facebook(
         else:
           return (
               False,
-              "Erro ao enviar foto do carrossel:"
+              f"Erro ao subir foto #{idx+1} para o carrossel:"
               f" {data_upload.get('error', {}).get('message', 'Erro')}",
           )
 
@@ -234,12 +244,15 @@ def postar_no_facebook(
       if link_oferta and link_oferta.strip():
         payload_feed["link"] = link_oferta.strip()
 
-      response = requests.post(url_feed, data=payload_feed, timeout=30)
+      response = requests.post(url_feed, data=payload_feed, timeout=40)
       res_data = response.json()
       return (
           (
               True,
-              "Publicado no Facebook com múltiplas fotos em alta resolução!",
+              (
+                  f"Publicado no Facebook com {len(attached_media_list)} fotos"
+                  " em alta resolução!"
+              ),
           )
           if ("id" in res_data or "post_id" in res_data)
           else (
@@ -283,6 +296,7 @@ with col2:
     st.write(f"📷 {len(imagens_upload)} imagem(ns) selecionada(s)")
     cols_img = st.columns(min(len(imagens_upload), 4))
     for idx, img in enumerate(imagens_upload):
+      img.seek(0)
       cols_img[idx % 4].image(img, use_container_width=True)
 
 descricao_extra = st.text_area(
@@ -410,4 +424,4 @@ with tab_roteiro_locucao:
               data=f,
               file_name="locucao_oferta.mp3",
               mime="audio/mp3",
-        )
+      )
