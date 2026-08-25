@@ -1,13 +1,13 @@
+import json
 import requests
 import streamlit as st
 
 st.set_page_config(
-    page_title="Painel de Ofertas Shopee", page_icon="🛍️", layout="centered"
+    page_title="Painel de Ofertas", page_icon="🛍️", layout="centered"
 )
 
 
 def send_album_to_telegram(token, chat_id, text, media_files):
-    # Envio de uma única foto
     if len(media_files) == 1:
         url = f"https://api.telegram.org/bot{token}/sendPhoto"
         payload = {"chat_id": chat_id, "caption": text, "parse_mode": "Markdown"}
@@ -15,21 +15,15 @@ def send_album_to_telegram(token, chat_id, text, media_files):
         response = requests.post(url, data=payload, files=files)
         return response.json()
 
-    # Envio de múltiplas fotos (Álbum / Carrossel)
     url = f"https://api.telegram.org/bot{token}/sendMediaGroup"
-
-    import json
-
     media = []
     files = {}
 
     for idx, file in enumerate(media_files):
         field_name = f"photo_{idx}"
         files[field_name] = file.getvalue()
-
         item = {"type": "photo", "media": f"attach://{field_name}"}
 
-        # A legenda só deve ser anexada no primeiro item do álbum
         if idx == 0:
             item["caption"] = text
             item["parse_mode"] = "Markdown"
@@ -37,13 +31,12 @@ def send_album_to_telegram(token, chat_id, text, media_files):
         media.append(item)
 
     payload = {"chat_id": chat_id, "media": json.dumps(media)}
-
     response = requests.post(url, data=payload, files=files)
     return response.json()
 
 
-st.title("🛍️ Painel Automático de Ofertas")
-st.write("Preencha os dados da promoção para publicar no Telegram.")
+st.title("🛍️ Painel de Ofertas (Telegram + WhatsApp)")
+st.write("Preencha a promoção para publicar no Telegram e formatar para o WhatsApp.")
 
 st.sidebar.header("🔑 Configurações do Telegram")
 telegram_token = st.sidebar.text_input(
@@ -58,16 +51,16 @@ telegram_chat_id = st.sidebar.text_input(
 with st.form("offer_form"):
     title = st.text_input("Nome do Produto", "Fone Bluetooth Sem Fio")
     price = st.text_input("Preço (R$)", "49,90")
-    code = st.text_input("Cupom/Código", "SHOPEE20")
+    code = st.text_input("Cupom/Código (opcional)", "SHOPEE20")
     affiliate_link = st.text_input("Link de Afiliado", "https://shope.ee/exemplo")
 
     media_files = st.file_uploader(
         "Selecione a(s) Imagem(ns) da Oferta",
         type=["jpg", "jpeg", "png"],
-        accept_multiple_files=True,  # Permite selecionar várias fotos
+        accept_multiple_files=True,
     )
 
-    submit = st.form_submit_button("🚀 Enviar para o Telegram")
+    submit = st.form_submit_button("🚀 Enviar Telegram & Gerar WhatsApp")
 
 if submit:
     if not media_files:
@@ -75,8 +68,15 @@ if submit:
     elif not telegram_token:
         st.error("Cole o seu Bot Token na barra lateral!")
     else:
-        caption_tg = f"🔥 *{title}*\n\n💰 Por apenas: *R$ {price}*\n🏷️ Cupom: `{code}`\n\n👇 *Compre pelo link:*\n{affiliate_link}"
+        # Formatação para o Telegram (Markdown)
+        cupom_tg = f"\n🏷️ Cupom: `{code}`" if code else ""
+        caption_tg = f"🔥 *{title}*\n\n💰 Por apenas: *R$ {price}*{cupom_tg}\n\n👇 *Compre pelo link:*\n{affiliate_link}"
 
+        # Formatação para o WhatsApp (Negritos com *)
+        cupom_wa = f"\n🏷️ Cupom: *{code}*" if code else ""
+        caption_wa = f"🔥 *{title}*\n\n💰 Por apenas: *R$ {price}*{cupom_wa}\n\n👇 *Compre pelo link:*\n{affiliate_link}"
+
+        # Envio para o Telegram
         res = send_album_to_telegram(
             telegram_token, telegram_chat_id, caption_tg, media_files
         )
@@ -84,4 +84,11 @@ if submit:
         if res.get("ok"):
             st.success("✅ Enviado para o Telegram com sucesso!")
         else:
-            st.error(f"❌ Erro ao enviar: {res.get('description')}")
+            st.error(f"❌ Erro ao enviar para o Telegram: {res.get('description')}")
+
+        # Exibição do texto formatado para o WhatsApp
+        st.subheader("📲 Texto Formatado para o WhatsApp")
+        st.code(caption_wa, language="markdown")
+        st.info(
+            "💡 **Dica:** Copie o texto acima e cole no seu Canal do WhatsApp junto com as fotos da promoção!"
+        )
