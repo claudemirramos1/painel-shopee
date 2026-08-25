@@ -14,8 +14,8 @@ FB_PAGE_TOKEN_FIXO = "EAAPFihJ9FJcBSWSZBdne8dP0ngvvIbl91jPCzrVi7Ub7HdOIMK6guYcr3
 TELEGRAM_BOT_TOKEN_FIXO = "8353706833:AAHhyPqgeNezFY1X4NTMegpaPf_UdVOBs04"
 TELEGRAM_CHAT_ID_FIXO = "-1004406728710"
 
-# 📸 ID correto da sua Conta Comercial do Instagram integrado!
-INSTAGRAM_USER_ID_FIXO = "e734c98074af31033728b42ab51dbe2b"  
+# 📸 ID numérico correto da Conta Comercial do Instagram integrado com sucesso!
+INSTAGRAM_USER_ID_FIXO = "1759076875129450"  
 
 # 🔑 Chave do ImgBB integrada
 IMGBB_API_KEY_FIXO = "82c69b4736c7793eaab429880014d06c"  
@@ -354,4 +354,4 @@ with tab_roteiro_locucao:
                         data=f,
                         file_name="locucao_oferta.mp3",
                         mime="audio/mp3"
-                )
+                       )
