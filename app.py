@@ -4,13 +4,19 @@ import json
 import os
 from gtts import gTTS
 
-# Importação padrão robusta do MoviePy
+# Importação blindada para o Streamlit Cloud
 try:
-    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
-except ImportError:
-    from moviepy.video.VideoClip import ImageClip
-    from moviepy.audio.io.AudioFileClip import AudioFileClip
-    from moviepy.video.compositing.concatenate import concatenate_videoclips
+    import moviepy.editor as mp
+    IMAGE_CLIP = mp.ImageClip
+    AUDIO_CLIP = mp.AudioFileClip
+    CONCAT_CLIPS = mp.concatenate_videoclips
+except Exception:
+    import moviepy.video.VideoClip as mp_vc
+    import moviepy.audio.io.AudioFileClip as mp_af
+    import moviepy.video.compositing.concatenate as mp_cc
+    IMAGE_CLIP = mp_vc.ImageClip
+    AUDIO_CLIP = mp_af.AudioFileClip
+    CONCAT_CLIPS = mp_cc.concatenate_videoclips
 
 # ==========================================
 # CONFIGURAÇÕES FIXAS
@@ -147,15 +153,13 @@ def gerar_video_shorts(titulo, preco_por, lista_imagens):
     try:
         texto_fala = f"Olha que oferta imperdível! {titulo}. Apenas por {preco_por} reais! Corra para garantir o seu!"
         
-        # 1. Gerar Áudio com gTTS
         tts = gTTS(text=texto_fala, lang='pt', tld='com.br')
         audio_path = "temp_audio.mp3"
         tts.save(audio_path)
         
-        audio_clip = AudioFileClip(audio_path)
+        audio_clip = AUDIO_CLIP(audio_path)
         duracao_total = audio_clip.duration
         
-        # 2. Processar imagens
         temp_img_paths = []
         num_imagens = len(lista_imagens)
         duracao_por_foto = max(duracao_total / num_imagens, 2.0)
@@ -167,10 +171,10 @@ def gerar_video_shorts(titulo, preco_por, lista_imagens):
                 f.write(img.getbuffer())
             temp_img_paths.append(img_path)
             
-            clip = ImageClip(img_path).set_duration(duracao_por_foto).resize(height=1920)
+            clip = IMAGE_CLIP(img_path).set_duration(duracao_por_foto).resize(height=1920)
             image_clips.append(clip)
             
-        video_base = concatenate_videoclips(image_clips, method="compose")
+        video_base = CONCAT_CLIPS(image_clips, method="compose")
         video_final = video_base.set_audio(audio_clip)
         
         output_video_path = "shorts_oferta.mp4"
