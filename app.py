@@ -6,7 +6,7 @@ from PIL import Image, ImageOps, ImageEnhance
 import io
 
 # ==========================================
-# CONFIGURAÇÕES FIXAS (Insira seus dados aqui)
+# 1. CONFIGURAÇÕES FIXAS (SEUS DADOS)
 # ==========================================
 FB_PAGE_ID_FIXO = "1214303865109377"
 FB_PAGE_TOKEN_FIXO = "EAAPFihJ9FJcBSWSZBdne8dP0ngvvIbl91jPCzrVi7Ub7HdOIMK6guYcr3ZAA58x2ppYVZBSuwZC9IMx1wMPpBKyAtTkSz5uqi8O4B6VCGKa943WRBVclQNizD2gbKUkckX5TIU3KonoYk7ecTwTpuZARrXd5m1ur14hxYf5qGjNYOw8L53ELcVqdCPr5jFeZCfC7w1dZAst"
@@ -14,11 +14,11 @@ FB_PAGE_TOKEN_FIXO = "EAAPFihJ9FJcBSWSZBdne8dP0ngvvIbl91jPCzrVi7Ub7HdOIMK6guYcr3
 TELEGRAM_BOT_TOKEN_FIXO = "8353706833:AAHhyPqgeNezFY1X4NTMegpaPf_UdVOBs04"
 TELEGRAM_CHAT_ID_FIXO = "-1004406728710"
 
-# Insira aqui o IG User ID que você descobriu na API Graph da Meta
+# -> QUANDO DESCOBRIR O ID DO INSTAGRAM, COLE ELE AQUI ENTRE AS ASPAS:
 INSTAGRAM_USER_ID_FIXO = ""  
 
 # ==========================================
-# CONFIGURAÇÕES INICIAIS DA PÁGINA
+# 2. CONFIGURAÇÕES DA PÁGINA STREAMLIT
 # ==========================================
 st.set_page_config(
     page_title="Painel de Ofertas & Redes Sociais",
@@ -30,7 +30,21 @@ st.title("🛍️ Painel de Automação de Ofertas (Facebook, Telegram & Instagr
 st.markdown("Publique ofertas com fotos tratadas em alta resolução (1080x1350) e automação completa.")
 
 # ==========================================
-# FUNÇÃO DE PROCESSAMENTO DE IMAGEM
+# 3. FERRAMENTA AUTOMÁTICA PARA ACHAR O ID DO INSTAGRAM
+# ==========================================
+with st.expander("🛠️ Clique aqui se precisar descobrir o seu ID do Instagram"):
+    st.markdown("Como você já tem a página do Facebook conectada, clique no botão abaixo para o sistema buscar o seu ID do Instagram automaticamente:")
+    if st.button("🔍 Buscar ID do Instagram Automaticamente"):
+        try:
+            url_busca = f"https://graph.facebook.com/v20.0/{FB_PAGE_ID_FIXO}?fields=instagram_business_account&access_token={FB_PAGE_TOKEN_FIXO}"
+            resp = requests.get(url_busca, timeout=10)
+            dados = resp.json()
+            st.json(dados)
+        except Exception as e:
+            st.error(f"Erro ao buscar: {e}")
+
+# ==========================================
+# 4. FUNÇÃO DE PROCESSAMENTO DE IMAGEM
 # ==========================================
 def processar_imagem_automaticamente(imagem_upload, target_size=(1080, 1350)):
     try:
@@ -58,7 +72,7 @@ def processar_imagem_automaticamente(imagem_upload, target_size=(1080, 1350)):
         return imagem_upload
 
 # ==========================================
-# FUNÇÕES DE REDES SOCIAIS
+# 5. FUNÇÕES DE POSTAGEM (REDES SOCIAIS)
 # ==========================================
 
 def postar_no_telegram(token, chat_id, texto, lista_imagens):
@@ -182,7 +196,6 @@ def postar_no_instagram(ig_user_id, page_token, texto_ig, url_imagem_publica, li
         if link_oferta and link_oferta.strip():
             legenda_limpa += f"\n\nLink: {link_oferta.strip()}"
 
-        # Passo 1: Criar o contêiner de mídia no Instagram
         url_container = f"https://graph.facebook.com/v26.0/{ig_user_id}/media"
         payload_container = {
             "image_url": url_imagem_publica,
@@ -195,7 +208,6 @@ def postar_no_instagram(ig_user_id, page_token, texto_ig, url_imagem_publica, li
         if "id" in data_c:
             creation_id = data_c["id"]
             
-            # Passo 2: Publicar o contêiner
             url_publish = f"https://graph.facebook.com/v26.0/{ig_user_id}/media_publish"
             payload_publish = {
                 "creation_id": creation_id,
@@ -212,7 +224,7 @@ def postar_no_instagram(ig_user_id, page_token, texto_ig, url_imagem_publica, li
         return False, f"Falha no Instagram: {str(e)}"
 
 # ==========================================
-# INTERFACE PRINCIPAL
+# 6. INTERFACE VISUAL (STREAMLIT)
 # ==========================================
 
 st.subheader("📝 Preencher Dados da Oferta")
@@ -229,7 +241,7 @@ with col2:
     link_afiliado = st.text_input("Link da Oferta / Afiliado", placeholder="https://...")
     
     imagens_upload = st.file_uploader(
-        "📸 Selecionar Imagens da Galeria (Pode escolher várias)", 
+        "📸 Selecionar Imagens da Galeria (Para Facebook e Telegram)", 
         type=["jpg", "jpeg", "png", "webp"],
         accept_multiple_files=True
     )
@@ -240,10 +252,10 @@ with col2:
         for idx, img in enumerate(imagens_upload):
             cols_img[idx % 4].image(img, use_container_width=True)
 
-descricao_extra = st.text_area("Observações / Detalhes Adicionais (Opcional)", placeholder="Ex: Frete Grátis para assinantes Prime", height=70)
-url_imagem_ig_manual = st.text_input("🔗 URL Pública da Imagem (Necessário apenas para postar no Instagram)", placeholder="Cole aqui o link direto da imagem na web...")
+descricao_extra = st.text_area("Observações / Detalhes Adicionais (Opcional)", placeholder="Ex: Frete Grátis", height=70)
+url_imagem_ig_manual = st.text_input("🔗 URL Pública da Imagem (Exigido apenas para o Instagram)", placeholder="Cole o link direto da imagem na web...")
 
-# Montagem do texto das publicações
+# Montagem do texto base
 texto_gerado = f"🔥 <b>{titulo_produto if titulo_produto else 'OFERTA IMPERDÍVEL'}</b>\n\n"
 if preco_de:
     texto_gerado += f"❌ De: R$ {preco_de}\n"
@@ -258,11 +270,10 @@ if link_afiliado:
 
 st.markdown("---")
 
-# Abas de Ações
 tab_redes, tab_roteiro_locucao = st.tabs(["📢 Redes Sociais", "🎙️ Roteiro & Locução IA"])
 
 with tab_redes:
-    st.markdown("### 🎯 Selecione os Destinos")
+    st.markdown("### 🎯 Selecione os Canais de Destino")
     col_check1, col_check2, col_check3 = st.columns(3)
     with col_check1:
         enviar_fb = st.checkbox("Facebook Page (HD)", value=True)
@@ -272,11 +283,12 @@ with tab_redes:
         enviar_ig = st.checkbox("Instagram", value=False)
 
     st.markdown("---")
-    if st.button("🚀 Postar Oferta em Todos os Canais", type="primary", use_container_width=True):
+    if st.button("🚀 Postar Oferta nos Canais Selecionados", type="primary", use_container_width=True):
         if not titulo_produto and not link_afiliado:
             st.warning("Preencha ao menos o Título e o Link do produto antes de postar.")
         else:
             st.info("Processando publicações...")
+            
             if enviar_fb:
                 st_fb, msg_fb = postar_no_facebook(FB_PAGE_ID_FIXO, FB_PAGE_TOKEN_FIXO, texto_gerado, imagens_upload, link_afiliado)
                 if st_fb:
