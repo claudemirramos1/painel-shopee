@@ -1,5 +1,6 @@
 import io
 import json
+import urllib.parse
 from gtts import gTTS
 from PIL import Image, ImageEnhance, ImageOps
 import requests
@@ -22,19 +23,19 @@ st.set_page_config(
 )
 
 st.title(
-    "🛍️ Painel de Automação de Ofertas com Otimização Automática de Imagem"
+    "🛍️ Painel de Automação de Ofertas com Múltiplas Fotos & Alta Resolução"
 )
 st.markdown(
-    "Publique ofertas com fotos redimensionadas em tela cheia (1080x1350) e"
-    " tratadas automaticamente para máxima nitidez no Facebook e Telegram."
+    "Publique ofertas com várias fotos tratadas em alta nitidez (1080x1350) e"
+    " links estruturados no Facebook, Telegram e WhatsApp."
 )
 
 
 # ==========================================
-# FUNÇÃO DE PROCESSAMENTO AUTOMÁTICO ROBUSTO
+# FUNÇÃO DE PROCESSAMENTO DE IMAGEM
 # ==========================================
 def processar_imagem_automaticamente(imagem_upload, target_size=(1080, 1350)):
-  """Processa a imagem de forma integrada com redefinição segura de ponteiro."""
+  """Padroniza para o formato vertical (1080x1350) e aplica nitidez e contraste."""
   try:
     if hasattr(imagem_upload, "seek"):
       imagem_upload.seek(0)
@@ -43,16 +44,13 @@ def processar_imagem_automaticamente(imagem_upload, target_size=(1080, 1350)):
     if img.mode in ("RGBA", "P"):
       img = img.convert("RGB")
 
-    # 1. Ajuste de proporção e preenchimento total de tela (Feed Vertical 4:5)
     img_ajustada = ImageOps.fit(
         img, target_size, method=Image.Resampling.LANCZOS, centering=(0.5, 0.5)
     )
 
-    # 2. Realce de Nitidez Avançado
     enhancer_sharpness = ImageEnhance.Sharpness(img_ajustada)
     img_nitida = enhancer_sharpness.enhance(1.8)
 
-    # 3. Realce de Contraste e Cor
     enhancer_contrast = ImageEnhance.Contrast(img_nitida)
     img_final = enhancer_contrast.enhance(1.15)
 
@@ -70,16 +68,51 @@ def processar_imagem_automaticamente(imagem_upload, target_size=(1080, 1350)):
 
 
 # ==========================================
-# FUNÇÕES DE REDES SOCIAIS
+# FUNÇÕES DE INTEGRACÃO E REDES SOCIAIS
 # ==========================================
+
+
+def gerar_link_whatsapp(texto, numero_telefone=""):
+  """Gera um link wa.me/api.whatsapp formatado com a oferta."""
+  # Limpa tags HTML para o formato do WhatsApp (*negrito*, ~riscado~, ```código```)
+  texto_wa = (
+      texto.replace("<b>", "*")
+      .replace("</b>", "*")
+      .replace("❌ De:", "~De:~")
+      .replace("<code>", "```")
+      .replace("</code>", "```")
+  )
+  texto_encoded = urllib.parse.quote(texto_wa)
+
+  if numero_telefone:
+    num_limpo = "".join(filter(str.isdigit, numero_telefone))
+    return f"https://api.whatsapp.com/send?phone={num_limpo}&text={texto_encoded}"
+  return f"https://api.whatsapp.com/send?text={texto_encoded}"
 
 
 def postar_no_telegram(token, chat_id, texto, lista_imagens):
   if not token or not chat_id:
     return False, "Token ou Chat ID do Telegram não informados."
   try:
-    if lista_imagens and len(lista_imagens) == 1:
-      img = lista_imagens[0]
+    imagens_processadas = (
+        [processar_imagem_automaticamente(img) for img in lista_imagens]
+        if lista_imagens
+        else []
+    )
+
+    if not imagens_processadas or len(imagens_processadas) == 0:
+      url = f"https://api.telegram.org/bot{token}/sendMessage"
+      data = {"chat_id": chat_id, "text": texto, "parse_mode": "HTML"}
+      response = requests.post(url, data=data, timeout=10)
+      res_data = response.json()
+      return (
+          (True, "Publicado no Telegram!")
+          if res_data.get("ok")
+          else (False, f"Erro Telegram: {res_data.get('description')}")
+      )
+
+    elif len(imagens_processadas) == 1:
+      img = imagens_processadas[0]
       img.seek(0)
       url = f"https://api.telegram.org/bot{token}/sendPhoto"
       files = {"photo": (img.name, img.getvalue(), img.type)}
@@ -92,11 +125,11 @@ def postar_no_telegram(token, chat_id, texto, lista_imagens):
           else (False, f"Erro Telegram: {res_data.get('description')}")
       )
 
-    elif lista_imagens and len(lista_imagens) > 1:
+    else:
       url = f"https://api.telegram.org/bot{token}/sendMediaGroup"
       media = []
       files = {}
-      for idx, img in enumerate(lista_imagens):
+      for idx, img in enumerate(imagens_processadas):
         img.seek(0)
         file_key = f"photo_{idx}"
         files[file_key] = (img.name, img.getvalue(), img.type)
@@ -110,18 +143,7 @@ def postar_no_telegram(token, chat_id, texto, lista_imagens):
       response = requests.post(url, data=data, files=files, timeout=30)
       res_data = response.json()
       return (
-          (True, "Álbum publicado no Telegram!")
-          if res_data.get("ok")
-          else (False, f"Erro Telegram: {res_data.get('description')}")
-      )
-
-    else:
-      url = f"https://api.telegram.org/bot{token}/sendMessage"
-      data = {"chat_id": chat_id, "text": texto, "parse_mode": "HTML"}
-      response = requests.post(url, data=data, timeout=10)
-      res_data = response.json()
-      return (
-          (True, "Publicado no Telegram!")
+          (True, "Álbum com múltiplas fotos publicado no Telegram!")
           if res_data.get("ok")
           else (False, f"Erro Telegram: {res_data.get('description')}")
       )
@@ -142,7 +164,6 @@ def postar_no_facebook(
         .replace("<code>", "")
         .replace("</code>", "")
     )
-
     imagens_processadas = (
         [processar_imagem_automaticamente(img) for img in lista_imagens]
         if lista_imagens
@@ -171,10 +192,12 @@ def postar_no_facebook(
       url = f"https://graph.facebook.com/v26.0/{page_id}/photos"
       files = {"source": (img.name, img.getvalue(), img.type)}
       payload = {"caption": legenda_limpa, "access_token": page_token}
+      if link_oferta and link_oferta.strip():
+        payload["link"] = link_oferta.strip()
       response = requests.post(url, data=payload, files=files, timeout=30)
       res_data = response.json()
       return (
-          (True, "Publicado no Facebook com imagem otimizada em tela cheia!")
+          (True, "Publicado no Facebook com foto em alta resolução!")
           if ("id" in res_data or "post_id" in res_data)
           else (
               False,
@@ -198,7 +221,7 @@ def postar_no_facebook(
         else:
           return (
               False,
-              "Erro ao enviar foto para o álbum:"
+              "Erro ao enviar foto do carrossel:"
               f" {data_upload.get('error', {}).get('message', 'Erro')}",
           )
 
@@ -208,13 +231,15 @@ def postar_no_facebook(
           "attached_media": json.dumps(attached_media_list),
           "access_token": page_token,
       }
+      if link_oferta and link_oferta.strip():
+        payload_feed["link"] = link_oferta.strip()
+
       response = requests.post(url_feed, data=payload_feed, timeout=30)
       res_data = response.json()
       return (
           (
               True,
-              "Álbum publicado no Facebook com imagens otimizadas em tela"
-              " cheia!",
+              "Publicado no Facebook com múltiplas fotos em alta resolução!",
           )
           if ("id" in res_data or "post_id" in res_data)
           else (
@@ -248,9 +273,8 @@ with col2:
       "Link da Oferta / Afiliado", placeholder="https://..."
   )
 
-  # CORREÇÃO APLICADA AQUI: Aceita amplamente múltiplos formatos de imagem juntos (jpg, jpeg, png, webp, heic)
   imagens_upload = st.file_uploader(
-      "📸 Selecionar Imagens da Galeria (Segure CTRL ou selecione várias)",
+      "📸 Selecionar Imagens da Galeria (Pode escolher várias)",
       type=["jpg", "jpeg", "png", "webp", "heic", "HEIC"],
       accept_multiple_files=True,
   )
@@ -291,13 +315,21 @@ tab_redes, tab_roteiro_locucao = st.tabs(
 
 with tab_redes:
   st.markdown("### 🎯 Selecione os Destinos")
-  col_check1, col_check2 = st.columns(2)
+  col_check1, col_check2, col_check3 = st.columns(3)
   with col_check1:
-    enviar_fb = st.checkbox(
-        "Facebook Page (Com Tratamento Automático HD)", value=True
-    )
+    enviar_fb = st.checkbox("Facebook Page (Múltiplas Fotos & HD)", value=True)
   with col_check2:
-    enviar_tg = st.checkbox("Telegram", value=True)
+    enviar_tg = st.checkbox("Telegram (Álbum com Várias Fotos)", value=True)
+  with col_check3:
+    enviar_wa = st.checkbox("WhatsApp (Gerar Link Direto)", value=True)
+
+  numero_wa = ""
+  if enviar_wa:
+    numero_wa = st.text_input(
+        "📱 Número do WhatsApp com DDD (Opcional - deixe vazio para abrir lista"
+        " de contatos)",
+        placeholder="5567999999999",
+    )
 
   st.markdown("---")
   if st.button(
@@ -310,10 +342,8 @@ with tab_redes:
           "Preencha ao menos o Título e o Link do produto antes de postar."
       )
     else:
-      st.info(
-          "Processando imagens automaticamente (Nitidez + Tela Cheia) e"
-          " enviando..."
-      )
+      st.info("Processando imagens, ajustando alta resolução e publicando...")
+
       if enviar_fb:
         st_fb, msg_fb = postar_no_facebook(
             FB_PAGE_ID_FIXO,
@@ -338,6 +368,13 @@ with tab_redes:
           st.success(f"✅ **Telegram:** {msg_tg}")
         else:
           st.error(f"❌ **Telegram:** {msg_tg}")
+
+      if enviar_wa:
+        url_wa = gerar_link_whatsapp(texto_gerado, numero_wa)
+        st.success("✅ **WhatsApp:** Link de disparo gerado com sucesso!")
+        st.link_button(
+            "📲 Abrir e Enviar no WhatsApp", url_wa, use_container_width=True
+        )
 
 with tab_roteiro_locucao:
   st.markdown("### 🎙️ Gerador de Roteiro Comercial & Áudio de Locução")
@@ -373,4 +410,4 @@ with tab_roteiro_locucao:
               data=f,
               file_name="locucao_oferta.mp3",
               mime="audio/mp3",
-          )
+        )
