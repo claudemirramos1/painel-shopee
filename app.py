@@ -23,16 +23,16 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🛍️ Painel de Automação de Ofertas com Redimensionamento Inteligente")
-st.markdown("Publique ofertas com imagens otimizadas para o Facebook e Telegram sem distorções.")
+st.title("🛍️ Painel de Automação de Ofertas com Redimensionamento Otimizado")
+st.markdown("Publique ofertas com imagens em alta resolução no formato ideal para o Feed do Facebook.")
 
 # ==========================================
-# FUNÇÃO DE OTIMIZAÇÃO DE IMAGEM PARA O FACEBOOK
+# FUNÇÃO DE OTIMIZAÇÃO DE IMAGEM PARA O FACEBOOK (TAMANHO GRANDE / VERTICAL 4:5)
 # ==========================================
-def otimizar_imagem_facebook(imagem_upload, target_size=(1080, 1080)):
+def otimizar_imagem_facebook(imagem_upload, target_size=(1080, 1350)):
     """
-    Redimensiona e ajusta qualquer imagem para o tamanho ideal do Facebook (1080x1080)
-    sem distorcer, adicionando barras proporcionais se necessário ou centralizando.
+    Redimensiona e ajusta qualquer imagem para o tamanho ideal de feed do Facebook (1080x1350 - Vertical 4:5),
+    ocupando o máximo de espaço na tela sem distorção e com fundo limpo.
     """
     try:
         img = Image.open(imagem_upload)
@@ -40,13 +40,13 @@ def otimizar_imagem_facebook(imagem_upload, target_size=(1080, 1080)):
         if img.mode in ("RGBA", "P"):
             img = img.convert("RGB")
             
-        # Cria uma imagem de fundo branco no tamanho ideal do Facebook
+        # Cria uma imagem de fundo branco no tamanho ideal expandido do Facebook (1080x1350)
         novo_fundo = Image.new("RGB", target_size, (255, 255, 255))
         
-        # Redimensiona mantendo a proporção original para caber dentro de 1080x1080
+        # Redimensiona mantendo a proporção original para caber dentro da área
         img.thumbnail(target_size, Image.Resampling.LANCZOS)
         
-        # Calcula a posição centralizada para colar a foto no fundo branco
+        # Calcula a posição centralizada para colar a foto no fundo
         x = (target_size[0] - img.width) // 2
         y = (target_size[1] - img.height) // 2
         
@@ -57,12 +57,10 @@ def otimizar_imagem_facebook(imagem_upload, target_size=(1080, 1080)):
         novo_fundo.save(output_buffer, format="JPEG", quality=95)
         output_buffer.seek(0)
         
-        # Cria um objeto compatível com os arquivos enviados do Streamlit
         output_buffer.name = "imagem_otimizada_fb.jpg"
         output_buffer.type = "image/jpeg"
         return output_buffer
     except Exception as e:
-        # Se ocorrer qualquer erro, retorna a imagem original tratada
         imagem_upload.seek(0)
         return imagem_upload
 
@@ -126,7 +124,7 @@ def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta
     try:
         legenda_limpa = texto_fb.replace("<b>", "").replace("</b>", "").replace("<code>", "").replace("</code>", "")
         
-        # Otimiza todas as imagens antes de enviar para o Facebook para garantir máxima qualidade sem distorção
+        # Otimiza todas as imagens para o novo tamanho grande do Facebook (1080x1350)
         imagens_otimizadas = [otimizar_imagem_facebook(img) for img in lista_imagens] if lista_imagens else []
         
         if not imagens_otimizadas or len(imagens_otimizadas) == 0:
@@ -146,7 +144,7 @@ def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta
             payload = {"caption": legenda_limpa, "access_token": page_token}
             response = requests.post(url, data=payload, files=files, timeout=30)
             res_data = response.json()
-            return (True, "Publicado no Facebook com foto otimizada!") if ("id" in res_data or "post_id" in res_data) else (False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro')}")
+            return (True, "Publicado no Facebook com foto ampliada!") if ("id" in res_data or "post_id" in res_data) else (False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro')}")
 
         else:
             attached_media_list = []
@@ -170,7 +168,7 @@ def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta
             }
             response = requests.post(url_feed, data=payload_feed, timeout=30)
             res_data = response.json()
-            return (True, "Álbum publicado no Facebook com fotos otimizadas!") if ("id" in res_data or "post_id" in res_data) else (False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro')}")
+            return (True, "Álbum publicado no Facebook com fotos ampliadas!") if ("id" in res_data or "post_id" in res_data) else (False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro')}")
 
     except Exception as e:
         return False, f"Falha no Facebook: {str(e)}"
@@ -228,7 +226,7 @@ with tab_redes:
     st.markdown("### 🎯 Selecione os Destinos")
     col_check1, col_check2 = st.columns(2)
     with col_check1:
-        enviar_fb = st.checkbox("Facebook Page (Com Otimização Automática)", value=True)
+        enviar_fb = st.checkbox("Facebook Page (Com Tamanho Ampliado 1080x1350)", value=True)
     with col_check2:
         enviar_tg = st.checkbox("Telegram", value=True)
 
@@ -237,7 +235,7 @@ with tab_redes:
         if not titulo_produto and not link_afiliado:
             st.warning("Preencha ao menos o Título e o Link do produto antes de postar.")
         else:
-            st.info("Otimizando imagens e enviando publicações...")
+            st.info("Ampliando imagem para o formato vertical e enviando...")
             if enviar_fb:
                 st_fb, msg_fb = postar_no_facebook(FB_PAGE_ID_FIXO, FB_PAGE_TOKEN_FIXO, texto_gerado, imagens_upload, link_afiliado)
                 if st_fb:
