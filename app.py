@@ -14,7 +14,7 @@ FB_PAGE_TOKEN_FIXO = "EAAPFihJ9FJcBSWSZBdne8dP0ngvvIbl91jPCzrVi7Ub7HdOIMK6guYcr3
 TELEGRAM_BOT_TOKEN_FIXO = "8353706833:AAHhyPqgeNezFY1X4NTMegpaPf_UdVOBs04"
 TELEGRAM_CHAT_ID_FIXO = "-1004406728710"
 
-# -> QUANDO DESCOBRIR O ID DO INSTAGRAM, COLE ELE AQUI ENTRE AS ASPAS:
+# -> COLE O SEU ID DO INSTAGRAM AQUI QUANDO APARECER NO DIAGNÓSTICO ABAIXO:
 INSTAGRAM_USER_ID_FIXO = ""  
 
 # ==========================================
@@ -30,18 +30,18 @@ st.title("🛍️ Painel de Automação de Ofertas (Facebook, Telegram & Instagr
 st.markdown("Publique ofertas com fotos tratadas em alta resolução (1080x1350) e automação completa.")
 
 # ==========================================
-# 3. FERRAMENTA AUTOMÁTICA PARA ACHAR O ID DO INSTAGRAM
+# 3. DIAGNÓSTICO AUTOMÁTICO (PARA ACHAR O ID DO INSTAGRAM)
 # ==========================================
-with st.expander("🛠️ Clique aqui se precisar descobrir o seu ID do Instagram"):
-    st.markdown("Como você já tem a página do Facebook conectada, clique no botão abaixo para o sistema buscar o seu ID do Instagram automaticamente:")
-    if st.button("🔍 Buscar ID do Instagram Automaticamente"):
+with st.expander("🔍 Descobrir ID do Instagram Automaticamente (Clique Aqui)", expanded=True):
+    st.markdown("O sistema vai tentar buscar o seu ID do Instagram na API da Meta usando os dados da sua página:")
+    if st.button("Executar Busca Automática do ID"):
         try:
-            url_busca = f"https://graph.facebook.com/v20.0/{FB_PAGE_ID_FIXO}?fields=instagram_business_account&access_token={FB_PAGE_TOKEN_FIXO}"
-            resp = requests.get(url_busca, timeout=10)
-            dados = resp.json()
-            st.json(dados)
-        except Exception as e:
-            st.error(f"Erro ao buscar: {e}")
+            url_diag = f"https://graph.facebook.com/v20.0/{FB_PAGE_ID_FIXO}?fields=instagram_business_account&access_token={FB_PAGE_TOKEN_FIXO}"
+            resp_diag = requests.get(url_diag, timeout=10)
+            dados_diag = resp_diag.json()
+            st.json(dados_diag)
+        except Exception as err:
+            st.error(f"Erro na requisição: {err}")
 
 # ==========================================
 # 4. FUNÇÃO DE PROCESSAMENTO DE IMAGEM
@@ -336,4 +336,4 @@ with tab_roteiro_locucao:
                         data=f,
                         file_name="locucao_oferta.mp3",
                         mime="audio/mp3"
-    )
+        )
