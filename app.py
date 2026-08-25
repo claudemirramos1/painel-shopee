@@ -1,6 +1,9 @@
 import streamlit as st
 import requests
 import json
+import os
+from gtts import gTTS
+from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
 
 # ==========================================
 # CONFIGURAÇÕES FIXAS
@@ -15,16 +18,16 @@ TELEGRAM_CHAT_ID_FIXO = "-1004406728710"
 # CONFIGURAÇÕES INICIAIS DA PÁGINA
 # ==========================================
 st.set_page_config(
-    page_title="Painel de Ofertas",
+    page_title="Painel de Ofertas & Vídeos",
     page_icon="🛍️",
     layout="wide"
 )
 
-st.title("🛍️ Painel de Automação de Ofertas")
-st.markdown("Crie promoções completas e publique no Facebook, Telegram e WhatsApp de forma automática.")
+st.title("🛍️ Painel de Automação de Ofertas & Vídeos")
+st.markdown("Publique ofertas nas redes e crie vídeos automáticos para o YouTube Shorts de forma gratuita.")
 
 # ==========================================
-# FUNÇÕES DE ENVIO
+# FUNÇÕES DE REDES SOCIAIS
 # ==========================================
 
 def postar_no_telegram(token, chat_id, texto, lista_imagens):
@@ -81,66 +84,41 @@ def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta
     if not page_id or not page_token:
         return False, "ID da Página ou Token de Acesso do FB não informados."
     try:
-        # Remove tags HTML para enviar texto limpo ao Facebook
         legenda_limpa = texto_fb.replace("<b>", "").replace("</b>", "").replace("<code>", "").replace("</code>", "")
         
-        # CASO 1: Nenhuma imagem (Apenas texto ou link)
         if not lista_imagens or len(lista_imagens) == 0:
             url = f"https://graph.facebook.com/v26.0/{page_id}/feed"
-            payload = {
-                "message": legenda_limpa,
-                "access_token": page_token
-            }
+            payload = {"message": legenda_limpa, "access_token": page_token}
             if link_oferta and link_oferta.strip():
                 payload["link"] = link_oferta.strip()
             response = requests.post(url, data=payload, timeout=15)
             res_data = response.json()
-            if "id" in res_data or "post_id" in res_data:
-                return True, "Publicado no Facebook!"
-            else:
-                err = res_data.get("error", {})
-                return False, f"Erro Facebook: {err.get('message', 'Erro desconhecido')}"
+            return (True, "Publicado no Facebook!") if ("id" in res_data or "post_id" in res_data) else (False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro')}")
 
-        # CASO 2: Apenas 1 imagem
         elif len(lista_imagens) == 1:
             img = lista_imagens[0]
             img.seek(0)
             url = f"https://graph.facebook.com/v26.0/{page_id}/photos"
             files = {"source": (img.name, img.getvalue(), img.type)}
-            payload = {
-                "caption": legenda_limpa,
-                "access_token": page_token
-            }
+            payload = {"caption": legenda_limpa, "access_token": page_token}
             response = requests.post(url, data=payload, files=files, timeout=30)
             res_data = response.json()
-            if "id" in res_data or "post_id" in res_data:
-                return True, "Publicado no Facebook com foto!"
-            else:
-                err = res_data.get("error", {})
-                return False, f"Erro Facebook: {err.get('message', 'Erro desconhecido')}"
+            return (True, "Publicado no Facebook com foto!") if ("id" in res_data or "post_id" in res_data) else (False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro')}")
 
-        # CASO 3: Múltiplas imagens (Álbum / Carrossel)
         else:
             attached_media_list = []
-            
-            # Passo A: Fazer upload de cada foto sem publicar (published=false)
             for img in lista_imagens:
                 img.seek(0)
                 url_upload = f"https://graph.facebook.com/v26.0/{page_id}/photos"
                 files = {"source": (img.name, img.getvalue(), img.type)}
-                payload_upload = {
-                    "published": "false",
-                    "access_token": page_token
-                }
+                payload_upload = {"published": "false", "access_token": page_token}
                 resp_upload = requests.post(url_upload, data=payload_upload, files=files, timeout=30)
                 data_upload = resp_upload.json()
-                
                 if "id" in data_upload:
                     attached_media_list.append({"media_fbid": data_upload["id"]})
                 else:
-                    return False, f"Erro ao enviar foto para o álbum do FB: {data_upload.get('error', {}).get('message', 'Erro desconhecido')}"
+                    return False, f"Erro ao enviar foto para o álbum: {data_upload.get('error', {}).get('message', 'Erro')}"
             
-            # Passo B: Criar a publicação oficial amarrando os IDs das fotos enviadas
             url_feed = f"https://graph.facebook.com/v26.0/{page_id}/feed"
             payload_feed = {
                 "message": legenda_limpa,
@@ -149,29 +127,76 @@ def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta
             }
             response = requests.post(url_feed, data=payload_feed, timeout=30)
             res_data = response.json()
-            
-            if "id" in res_data or "post_id" in res_data:
-                return True, "Álbum publicado no Facebook com sucesso!"
-            else:
-                err = res_data.get("error", {})
-                return False, f"Erro Facebook (Álbum): {err.get('message', 'Erro desconhecido')}"
+            return (True, "Álbum publicado no Facebook com sucesso!") if ("id" in res_data or "post_id" in res_data) else (False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro')}")
 
     except Exception as e:
         return False, f"Falha no Facebook: {str(e)}"
 
+# ==========================================
+# FUNÇÃO DE GERAÇÃO DE VÍDEO AUTOMÁTICO
+# ==========================================
 
-def postar_no_whatsapp(webhook_url, texto):
-    if not webhook_url:
-        return False, "URL de API/Webhook do WhatsApp não configurada."
+def gerar_video_shorts(titulo, preco_por, lista_imagens):
     try:
-        payload = {"message": texto}
-        response = requests.post(webhook_url, json=payload, timeout=10)
-        if response.status_code in [200, 201]:
-            return True, "Enviado para o WhatsApp!"
-        else:
-            return False, f"Erro WhatsApp (Status {response.status_code})"
+        # Texto que a IA vai falar no vídeo
+        texto_fala = f"Olha que oferta imperdível! {titulo}. Apenas por {preco_por} reais! Corra para garantir o seu!"
+        
+        # 1. Gerar Áudio com gTTS (Voz do Google em Português)
+        tts = gTTS(text=texto_fala, lang='pt', tld='com.br')
+        audio_path = "temp_audio.mp3"
+        tts.save(audio_path)
+        
+        # Carregar o áudio para saber a duração exata
+        audio_clip = AudioFileClip(audio_path)
+        duracao_total = audio_clip.duration
+        
+        # 2. Processar imagens e calcular o tempo de cada uma na tela
+        temp_img_paths = []
+        num_imagens = len(lista_imagens)
+        duracao_por_foto = max(duracao_total / num_imagens, 2.0) # Mínimo 2 segundos por foto
+        
+        image_clips = []
+        for idx, img in enumerate(lista_imagens):
+            img_path = f"temp_img_{idx}.jpg"
+            with open(img_path, "wb") as f:
+                f.write(img.getbuffer())
+            temp_img_paths.append(img_path)
+            
+            # Criar clipe da imagem com tamanho padrão Shorts (Vertical 1080x1920)
+            # Definimos redimensionamento simples compatível com MoviePy
+            clip = ImageClip(img_path).set_duration(duracao_por_foto).resize(height=1920)
+            image_clips.append(clip)
+            
+        # Concatenar as fotos em sequência
+        video_base = concatenate_videoclips(image_clips, method="compose")
+        
+        # Ajustar a duração do vídeo para acompanhar o áudio
+        video_final = video_base.set_audio(audio_clip)
+        
+        # Salvar arquivo de saída MP4
+        output_video_path = "shorts_oferta.mp4"
+        video_final.write_videofile(
+            output_video_path, 
+            fps=24, 
+            codec="libx264", 
+            audio_codec="aac",
+            preset="ultrafast",
+            logger=None
+        )
+        
+        # Fechar clips para liberar memória
+        audio_clip.close()
+        video_final.close()
+        
+        # Limpar arquivos temporários de imagem
+        for p in temp_img_paths:
+            if os.path.exists(p):
+                os.remove(p)
+                
+        return True, output_video_path
+        
     except Exception as e:
-        return False, f"Falha no WhatsApp: {str(e)}"
+        return False, str(e)
 
 # ==========================================
 # INTERFACE PRINCIPAL
@@ -222,49 +247,58 @@ st.subheader("👀 Pré-visualização da Mensagem")
 st.info(texto_gerado)
 
 st.markdown("---")
-st.markdown("### 🎯 Selecione os Destinos")
-col_check1, col_check2, col_check3 = st.columns(3)
+st.tabs(["📢 Redes Sociais", "🎬 Gerador de Shorts"])
 
-with col_check1:
-    enviar_fb = st.checkbox("Facebook Page", value=True)
-with col_check2:
-    enviar_tg = st.checkbox("Telegram", value=True)
-with col_check3:
-    enviar_wsp = st.checkbox("WhatsApp", value=False)
+tab_redes, tab_shorts = st.tabs(["📢 Redes Sociais", "🎬 Gerador de Shorts"])
 
-if enviar_wsp:
-    wsp_webhook_url = st.text_input("URL do Webhook / API WhatsApp", placeholder="https://sua-api-whatsapp.com/send")
-else:
-    wsp_webhook_url = ""
+with tab_redes:
+    st.markdown("### 🎯 Selecione os Destinos")
+    col_check1, col_check2 = st.columns(2)
+    with col_check1:
+        enviar_fb = st.checkbox("Facebook Page", value=True)
+    with col_check2:
+        enviar_tg = st.checkbox("Telegram", value=True)
 
-st.markdown("---")
+    st.markdown("---")
+    if st.button("🚀 Postar Oferta em Todos os Canais", type="primary", use_container_width=True):
+        if not titulo_produto and not link_afiliado:
+            st.warning("Preencha ao menos o Título e o Link do produto antes de postar.")
+        else:
+            st.info("Enviando publicações...")
+            if enviar_fb:
+                st_fb, msg_fb = postar_no_facebook(FB_PAGE_ID_FIXO, FB_PAGE_TOKEN_FIXO, texto_gerado, imagens_upload, link_afiliado)
+                if st_fb:
+                    st.success(f"✅ **Facebook:** {msg_fb}")
+                else:
+                    st.error(f"❌ **Facebook:** {msg_fb}")
+                    
+            if enviar_tg:
+                st_tg, msg_tg = postar_no_telegram(TELEGRAM_BOT_TOKEN_FIXO, TELEGRAM_CHAT_ID_FIXO, texto_gerado, imagens_upload)
+                if st_tg:
+                    st.success(f"✅ **Telegram:** {msg_tg}")
+                else:
+                    st.error(f"❌ **Telegram:** {msg_tg}")
 
-if st.button("🚀 Postar Oferta em Todos os Canais", type="primary", use_container_width=True):
-    if not titulo_produto and not link_afiliado:
-        st.warning("Preencha ao menos o Título e o Link do produto antes de postar.")
-    else:
-        st.info("Enviando publicações...")
-        
-        # Facebook
-        if enviar_fb:
-            st_fb, msg_fb = postar_no_facebook(FB_PAGE_ID_FIXO, FB_PAGE_TOKEN_FIXO, texto_gerado, imagens_upload, link_afiliado)
-            if st_fb:
-                st.success(f"✅ **Facebook:** {msg_fb}")
-            else:
-                st.error(f"❌ **Facebook:** {msg_fb}")
-                
-        # Telegram
-        if enviar_tg:
-            st_tg, msg_tg = postar_no_telegram(TELEGRAM_BOT_TOKEN_FIXO, TELEGRAM_CHAT_ID_FIXO, texto_gerado, imagens_upload)
-            if st_tg:
-                st.success(f"✅ **Telegram:** {msg_tg}")
-            else:
-                st.error(f"❌ **Telegram:** {msg_tg}")
-                
-        # WhatsApp
-        if enviar_wsp:
-            st_wsp, msg_wsp = postar_no_whatsapp(wsp_webhook_url, texto_gerado)
-            if st_wsp:
-                st.success(f"✅ **WhatsApp:** {msg_wsp}")
-            else:
-                st.error(f"❌ **WhatsApp:** {msg_wsp}")
+with tab_shorts:
+    st.markdown("### 🎬 Criador Automático de Vídeo para YouTube Shorts / Reels")
+    st.markdown("Transforme as fotos e o preço do produto em um vídeo narrado automaticamente.")
+    
+    if st.button("⚡ Gerar Vídeo para Shorts Agora", type="primary", use_container_width=True):
+        if not titulo_produto or not preco_por or not imagens_upload:
+            st.warning("Para gerar o vídeo, preencha ao menos o Título, o Preço Por e selecione ao menos 1 imagem.")
+        else:
+            with st.spinner("Criando áudio falado, organizando fotos e renderizando o vídeo... Aguarde alguns segundos."):
+                sucesso, resultado = gerar_video_shorts(titulo_produto, preco_por, imagens_upload)
+                if sucesso:
+                    st.success("🎉 Vídeo gerado com sucesso!")
+                    st.video(resultado)
+                    
+                    with open(resultado, "rb") as file:
+                        st.download_button(
+                            label="📥 Baixar Vídeo MP4",
+                            data=file,
+                            file_name="shorts_oferta.mp4",
+                            mime="video/mp4"
+                        )
+                else:
+                    st.error(f"❌ Erro ao gerar vídeo: {resultado}")
