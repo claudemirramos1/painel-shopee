@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+import json
 
 # ==========================================
 # CONFIGURAÇÕES FIXAS
@@ -59,7 +60,7 @@ def postar_no_telegram(token, chat_id, texto, lista_imagens):
             
             data = {
                 "chat_id": chat_id,
-                "media": requests.compat.json.dumps(media)
+                "media": json.dumps(media)
             }
             response = requests.post(url, data=data, files=files, timeout=30)
             res_data = response.json()
@@ -83,26 +84,8 @@ def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta
         # Remove tags HTML para enviar texto limpo ao Facebook
         legenda_limpa = texto_fb.replace("<b>", "").replace("</b>", "").replace("<code>", "").replace("</code>", "")
         
-        # Se houver imagem anexada, publica na rota /photos
-        if lista_imagens and len(lista_imagens) > 0:
-            img = lista_imagens[0]
-            img.seek(0)
-            url = f"https://graph.facebook.com/v26.0/{page_id}/photos"
-            
-            files = {
-                "source": (img.name, img.getvalue(), img.type)
-            }
-            payload = {
-                "caption": legenda_limpa,
-                "access_token": page_token
-            }
-            if link_oferta and link_oferta.strip():
-                # Nota: Na API de fotos do FB, o link opcional pode ir na legenda ou não ser aceito simultaneamente dependendo da regra, mas a caption já tem o link.
-                pass
-                
-            response = requests.post(url, data=payload, files=files, timeout=30)
-        else:
-            # Caso não tenha imagem, posta como texto/link normal no /feed
+        # CASO 1: Nenhuma imagem (Apenas texto ou link)
+        if not lista_imagens or len(lista_imagens) == 0:
             url = f"https://graph.facebook.com/v26.0/{page_id}/feed"
             payload = {
                 "message": legenda_limpa,
@@ -111,14 +94,68 @@ def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta
             if link_oferta and link_oferta.strip():
                 payload["link"] = link_oferta.strip()
             response = requests.post(url, data=payload, timeout=15)
-            
-        res_data = response.json()
-        
-        if "id" in res_data or "post_id" in res_data:
-            return True, "Publicado no Facebook com foto!" if (lista_imagens and len(lista_imagens) > 0) else "Publicado no Facebook!"
+            res_data = response.json()
+            if "id" in res_data or "post_id" in res_data:
+                return True, "Publicado no Facebook!"
+            else:
+                err = res_data.get("error", {})
+                return False, f"Erro Facebook: {err.get('message', 'Erro desconhecido')}"
+
+        # CASO 2: Apenas 1 imagem
+        elif len(lista_imagens) == 1:
+            img = lista_imagens[0]
+            img.seek(0)
+            url = f"https://graph.facebook.com/v26.0/{page_id}/photos"
+            files = {"source": (img.name, img.getvalue(), img.type)}
+            payload = {
+                "caption": legenda_limpa,
+                "access_token": page_token
+            }
+            response = requests.post(url, data=payload, files=files, timeout=30)
+            res_data = response.json()
+            if "id" in res_data or "post_id" in res_data:
+                return True, "Publicado no Facebook com foto!"
+            else:
+                err = res_data.get("error", {})
+                return False, f"Erro Facebook: {err.get('message', 'Erro desconhecido')}"
+
+        # CASO 3: Múltiplas imagens (Álbum / Carrossel)
         else:
-            err = res_data.get("error", {})
-            return False, f"Erro Facebook: {err.get('message', 'Erro desconhecido')}"
+            attached_media_list = []
+            
+            # Passo A: Fazer upload de cada foto sem publicar (published=false)
+            for img in lista_imagens:
+                img.seek(0)
+                url_upload = f"https://graph.facebook.com/v26.0/{page_id}/photos"
+                files = {"source": (img.name, img.getvalue(), img.type)}
+                payload_upload = {
+                    "published": "false",
+                    "access_token": page_token
+                }
+                resp_upload = requests.post(url_upload, data=payload_upload, files=files, timeout=30)
+                data_upload = resp_upload.json()
+                
+                if "id" in data_upload:
+                    attached_media_list.append({"media_fbid": data_upload["id"]})
+                else:
+                    return False, f"Erro ao enviar foto para o álbum do FB: {data_upload.get('error', {}).get('message', 'Erro desconhecido')}"
+            
+            # Passo B: Criar a publicação oficial amarrando os IDs das fotos enviadas
+            url_feed = f"https://graph.facebook.com/v26.0/{page_id}/feed"
+            payload_feed = {
+                "message": legenda_limpa,
+                "attached_media": json.dumps(attached_media_list),
+                "access_token": page_token
+            }
+            response = requests.post(url_feed, data=payload_feed, timeout=30)
+            res_data = response.json()
+            
+            if "id" in res_data or "post_id" in res_data:
+                return True, "Álbum publicado no Facebook com sucesso!"
+            else:
+                err = res_data.get("error", {})
+                return False, f"Erro Facebook (Álbum): {err.get('message', 'Erro desconhecido')}"
+
     except Exception as e:
         return False, f"Falha no Facebook: {str(e)}"
 
