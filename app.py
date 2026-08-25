@@ -2,6 +2,16 @@ import streamlit as st
 import requests
 
 # ==========================================
+# CONFIGURAÇÕES FIXAS (SEM PRECISAR DIGITAR)
+# ==========================================
+# Seus dados configurados diretamente no código
+FB_PAGE_ID_FIXO = "1214303865109377"
+FB_PAGE_TOKEN_FIXO = "EAAPFihJ9FJcBSWSZBdne8dP0ngvvIbl91jPCzrVi7Ub7HdOIMK6guYcr3ZAA58x2ppYVZBSuwZC9IMx1wMPpBKyAtTkSz5uqi8O4B6VCGKa943WRBVclQNizD2gbKUkckX5TIU3KonoYk7ecTwTpuZARrXd5m1ur14hxYf5qGjNYOw8L53ELcVqdCPr5jFeZCfC7w1dZAst"
+
+TELEGRAM_BOT_TOKEN_FIXO = "8353706833:AAHhyPqgeNezFY1X4NTMegpaPf_UdVOBs04"
+TELEGRAM_CHAT_ID_FIXO = "-1004406728710"
+
+# ==========================================
 # CONFIGURAÇÕES INICIAIS DA PÁGINA
 # ==========================================
 st.set_page_config(
@@ -11,48 +21,7 @@ st.set_page_config(
 )
 
 st.title("🛍️ Painel de Automação de Ofertas")
-st.markdown("Crie promoções completas e publique no Facebook, Telegram e WhatsApp.")
-
-# ==========================================
-# BARRA LATERAL - CONFIGURAÇÕES DE API
-# ==========================================
-st.sidebar.header("⚙️ Configurações das APIs")
-
-# Telegram
-st.sidebar.subheader("Telegram")
-telegram_bot_token = st.sidebar.text_input(
-    "Bot Token (Telegram)", 
-    value="8353706833:AAHhyPqgeNezFY1X4NTMegpaPf_UdVOBs04", 
-    type="password", 
-    key="tg_token"
-)
-telegram_chat_id = st.sidebar.text_input(
-    "Chat ID / Canal (Telegram)", 
-    value="-1004406728710", 
-    key="tg_chat_id"
-)
-
-# Facebook Page (Atualizado com o novo token de página)
-st.sidebar.subheader("Facebook Page")
-fb_page_id = st.sidebar.text_input(
-    "ID da Página FB", 
-    value="1283510278175598", 
-    key="fb_page_id"
-)
-fb_page_token = st.sidebar.text_input(
-    "Token da Página FB", 
-    value="EAAPZAdxais7gBSeZBbkkd4DwZB63yAG4n2YNSz2sg4O05GbJZBm5QszHvtaaEIsMZBFbxD5erXmrcxvGUQkmZBE278QberfbeO7ZBDPQQwNwmVVzzV3LCoKcLbZAqm7sZAY7pv6rG9hPPuJ65VTke5huNMc7Q9XqT2nZCIsfg70RcZALp4e55CZCTRZBF7YyigLUt4hUFZAQp7g4rgNkrnjv5BdV1bW8eTETk8W9ToNgjx9nCXvn8ZD", 
-    type="password", 
-    key="fb_page_token"
-)
-
-# WhatsApp
-st.sidebar.subheader("WhatsApp")
-wsp_webhook_url = st.sidebar.text_input(
-    "URL do Webhook / API WhatsApp", 
-    key="wsp_url", 
-    placeholder="https://sua-api-whatsapp.com/send"
-)
+st.markdown("Crie promoções completas e publique no Facebook, Telegram e WhatsApp de forma automática.")
 
 # ==========================================
 # FUNÇÕES DE ENVIO
@@ -112,6 +81,7 @@ def postar_no_facebook(page_id, page_token, texto_fb, link_oferta=None):
     if not page_id or not page_token:
         return False, "ID da Página ou Token de Acesso do FB não informados."
     try:
+        # Remove tags HTML para enviar texto limpo ao Facebook
         legenda_limpa = texto_fb.replace("<b>", "").replace("</b>", "").replace("<code>", "").replace("</code>", "")
         url = f"https://graph.facebook.com/v26.0/{page_id}/feed"
         
@@ -206,6 +176,12 @@ with col_check2:
 with col_check3:
     enviar_wsp = st.checkbox("WhatsApp", value=False)
 
+# Campo opcional para WhatsApp apenas caso queira usar
+if enviar_wsp:
+    wsp_webhook_url = st.text_input("URL do Webhook / API WhatsApp", placeholder="https://sua-api-whatsapp.com/send")
+else:
+    wsp_webhook_url = ""
+
 st.markdown("---")
 
 if st.button("🚀 Postar Oferta em Todos os Canais", type="primary", use_container_width=True):
@@ -216,7 +192,7 @@ if st.button("🚀 Postar Oferta em Todos os Canais", type="primary", use_contai
         
         # Facebook
         if enviar_fb:
-            st_fb, msg_fb = postar_no_facebook(fb_page_id, fb_page_token, texto_gerado, link_afiliado)
+            st_fb, msg_fb = postar_no_facebook(FB_PAGE_ID_FIXO, FB_PAGE_TOKEN_FIXO, texto_gerado, link_afiliado)
             if st_fb:
                 st.success(f"✅ **Facebook:** {msg_fb}")
             else:
@@ -224,7 +200,7 @@ if st.button("🚀 Postar Oferta em Todos os Canais", type="primary", use_contai
                 
         # Telegram
         if enviar_tg:
-            st_tg, msg_tg = postar_no_telegram(telegram_bot_token, telegram_chat_id, texto_gerado, imagens_upload)
+            st_tg, msg_tg = postar_no_telegram(TELEGRAM_BOT_TOKEN_FIXO, TELEGRAM_CHAT_ID_FIXO, texto_gerado, imagens_upload)
             if st_tg:
                 st.success(f"✅ **Telegram:** {msg_tg}")
             else:
