@@ -178,7 +178,7 @@ with col2:
         st.write(f"📷 {len(imagens_upload)} imagem(ns) selecionada(s)")
         cols_img = st.columns(min(len(imagens_upload), 4))
         for idx, img in enumerate(imagens_upload):
-            cols_img[idx % 4].image(img, use_column_width=True)
+            cols_img[idx % 4].image(img, use_container_width=True)
 
 descricao_extra = st.text_area("Observações / Detalhes Adicionais (Opcional)", placeholder="Ex: Frete Grátis para assinantes Prime", height=70)
 
