@@ -440,4 +440,4 @@ with col_btn2:
       </a>
       """,
       unsafe_allow_html=True,
-    )
+      )
