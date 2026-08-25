@@ -138,22 +138,20 @@ def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta
 
 def gerar_video_shorts(titulo, preco_por, lista_imagens):
     try:
-        # Texto que a IA vai falar no vídeo
         texto_fala = f"Olha que oferta imperdível! {titulo}. Apenas por {preco_por} reais! Corra para garantir o seu!"
         
-        # 1. Gerar Áudio com gTTS (Voz do Google em Português)
+        # 1. Gerar Áudio com gTTS
         tts = gTTS(text=texto_fala, lang='pt', tld='com.br')
         audio_path = "temp_audio.mp3"
         tts.save(audio_path)
         
-        # Carregar o áudio para saber a duração exata
         audio_clip = AudioFileClip(audio_path)
         duracao_total = audio_clip.duration
         
-        # 2. Processar imagens e calcular o tempo de cada uma na tela
+        # 2. Processar imagens
         temp_img_paths = []
         num_imagens = len(lista_imagens)
-        duracao_por_foto = max(duracao_total / num_imagens, 2.0) # Mínimo 2 segundos por foto
+        duracao_por_foto = max(duracao_total / num_imagens, 2.0)
         
         image_clips = []
         for idx, img in enumerate(lista_imagens):
@@ -162,18 +160,12 @@ def gerar_video_shorts(titulo, preco_por, lista_imagens):
                 f.write(img.getbuffer())
             temp_img_paths.append(img_path)
             
-            # Criar clipe da imagem com tamanho padrão Shorts (Vertical 1080x1920)
-            # Definimos redimensionamento simples compatível com MoviePy
             clip = ImageClip(img_path).set_duration(duracao_por_foto).resize(height=1920)
             image_clips.append(clip)
             
-        # Concatenar as fotos em sequência
         video_base = concatenate_videoclips(image_clips, method="compose")
-        
-        # Ajustar a duração do vídeo para acompanhar o áudio
         video_final = video_base.set_audio(audio_clip)
         
-        # Salvar arquivo de saída MP4
         output_video_path = "shorts_oferta.mp4"
         video_final.write_videofile(
             output_video_path, 
@@ -184,11 +176,9 @@ def gerar_video_shorts(titulo, preco_por, lista_imagens):
             logger=None
         )
         
-        # Fechar clips para liberar memória
         audio_clip.close()
         video_final.close()
         
-        # Limpar arquivos temporários de imagem
         for p in temp_img_paths:
             if os.path.exists(p):
                 os.remove(p)
@@ -247,7 +237,6 @@ st.subheader("👀 Pré-visualização da Mensagem")
 st.info(texto_gerado)
 
 st.markdown("---")
-st.tabs(["📢 Redes Sociais", "🎬 Gerador de Shorts"])
 
 tab_redes, tab_shorts = st.tabs(["📢 Redes Sociais", "🎬 Gerador de Shorts"])
 
