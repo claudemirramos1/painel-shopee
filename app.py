@@ -340,9 +340,9 @@ with col3_right:
 
   if ct1.button("🚚 Frete Grátis"):
     adicionar_tag("🚚 Frete Grátis")
-  if ct2.button("⚡ Relâmpago"):
+  if ct2.button("⚡ Oferta"):
     adicionar_tag("⚡ Oferta")
-  if ct3.button("⭐ Do Dia"):
+  if ct3.button("⭐ Oferta do Dia"):
     adicionar_tag("⭐ Oferta do Dia")
 
 # --- LINHA 4: CUPOM E OBSERVAÇÕES ---
