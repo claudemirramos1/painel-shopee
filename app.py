@@ -36,7 +36,6 @@ st.markdown(
 def processar_imagem_automaticamente(imagem_upload, target_size=(1080, 1350)):
   """Processa a imagem de forma integrada com redefinição segura de ponteiro."""
   try:
-    # Garante que o ponteiro do arquivo enviado está no início
     if hasattr(imagem_upload, "seek"):
       imagem_upload.seek(0)
 
@@ -65,7 +64,6 @@ def processar_imagem_automaticamente(imagem_upload, target_size=(1080, 1350)):
     output_buffer.type = "image/jpeg"
     return output_buffer
   except Exception as e:
-    # Caso ocorra qualquer falha, garante o retorno limpo resetando o ponteiro original
     if hasattr(imagem_upload, "seek"):
       imagem_upload.seek(0)
     return imagem_upload
@@ -145,7 +143,6 @@ def postar_no_facebook(
         .replace("</code>", "")
     )
 
-    # Processamento seguro com cópias limpas dos buffers de imagem
     imagens_processadas = (
         [processar_imagem_automaticamente(img) for img in lista_imagens]
         if lista_imagens
@@ -251,9 +248,10 @@ with col2:
       "Link da Oferta / Afiliado", placeholder="https://..."
   )
 
+  # CORREÇÃO APLICADA AQUI: Aceita amplamente múltiplos formatos de imagem juntos (jpg, jpeg, png, webp, heic)
   imagens_upload = st.file_uploader(
-      "📸 Selecionar Imagens da Galeria (Pode escolher várias)",
-      type=["jpg", "jpeg", "png", "webp"],
+      "📸 Selecionar Imagens da Galeria (Segure CTRL ou selecione várias)",
+      type=["jpg", "jpeg", "png", "webp", "heic", "HEIC"],
       accept_multiple_files=True,
   )
 
@@ -375,4 +373,4 @@ with tab_roteiro_locucao:
               data=f,
               file_name="locucao_oferta.mp3",
               mime="audio/mp3",
-        )
+          )
