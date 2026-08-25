@@ -33,6 +33,8 @@ def processar_imagem_segura(
 ):
   """Lê os bytes da foto em um buffer em memória e aplica melhorias se ativado."""
   try:
+    # Garante que o ponteiro do arquivo enviado esteja no início
+    imagem_upload.seek(0)
     bytes_data = imagem_upload.getvalue()
     input_buffer = io.BytesIO(bytes_data)
 
@@ -55,8 +57,10 @@ def processar_imagem_segura(
     img_ajustada.save(output_buffer, format="JPEG", quality=92)
     output_buffer.seek(0)
 
-    output_buffer.name = getattr(imagem_upload, "name", "oferta_hd.jpg")
-    output_buffer.type = "image/jpeg"
+    # Atribuição segura de nome sem quebrar a classe BytesIO
+    nome_original = getattr(imagem_upload, "name", "oferta_hd.jpg")
+    setattr(output_buffer, "name", nome_original)
+    setattr(output_buffer, "type", "image/jpeg")
     return output_buffer
   except Exception as e:
     st.warning(
@@ -285,7 +289,6 @@ with col2:
       type=["jpg", "jpeg", "png", "webp"],
       accept_multiple_files=True,
       key="uploader_fotos_galeria",
-      max_upload_size=500,
   )
 
   if imagens_upload:
@@ -440,4 +443,4 @@ with col_btn2:
       </a>
       """,
       unsafe_allow_html=True,
-      )
+      )  
