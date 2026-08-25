@@ -14,8 +14,10 @@ FB_PAGE_TOKEN_FIXO = "EAAPFihJ9FJcBSWSZBdne8dP0ngvvIbl91jPCzrVi7Ub7HdOIMK6guYcr3
 TELEGRAM_BOT_TOKEN_FIXO = "8353706833:AAHhyPqgeNezFY1X4NTMegpaPf_UdVOBs04"
 TELEGRAM_CHAT_ID_FIXO = "-1004406728710"
 
-# ID do Instagram configurado com sucesso!
 INSTAGRAM_USER_ID_FIXO = "1061621736477847"  
+
+# 🔑 Chave do ImgBB integrada com sucesso!
+IMGBB_API_KEY_FIXO = "82c69b4736c7793eaab429880014d06c"  
 
 # ==========================================
 # 2. CONFIGURAÇÕES DA PÁGINA STREAMLIT
@@ -30,7 +32,7 @@ st.title("🛍️ Painel de Automação de Ofertas (Facebook, Telegram & Instagr
 st.markdown("Publique ofertas com fotos tratadas em alta resolução (1080x1350) e automação completa.")
 
 # ==========================================
-# 3. FUNÇÃO DE PROCESSAMENTO DE IMAGEM
+# 3. FUNÇÕES DE SUPORTE (IMAGEM & IMGBB)
 # ==========================================
 def processar_imagem_automaticamente(imagem_upload, target_size=(1080, 1350)):
     try:
@@ -56,6 +58,25 @@ def processar_imagem_automaticamente(imagem_upload, target_size=(1080, 1350)):
     except Exception as e:
         imagem_upload.seek(0)
         return imagem_upload
+
+def subir_imagem_para_imgbb(img_buffer, api_key):
+    """Envia a imagem tratada para o ImgBB e retorna uma URL pública permanente"""
+    if not api_key:
+        return None
+    try:
+        img_buffer.seek(0)
+        url_api = "https://api.imgbb.com/1/upload"
+        payload = {"key": api_key}
+        files = {"image": ("oferta.jpg", img_buffer.getvalue(), "image/jpeg")}
+        
+        response = requests.post(url_api, data=payload, files=files, timeout=20)
+        resultado = response.json()
+        
+        if resultado.get("success"):
+            return resultado["data"]["url"]
+        return None
+    except Exception:
+        return None
 
 # ==========================================
 # 4. FUNÇÕES DE POSTAGEM (REDES SOCIAIS)
@@ -172,12 +193,21 @@ def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta
         return False, f"Falha no Facebook: {str(e)}"
 
 
-def postar_no_instagram(ig_user_id, page_token, texto_ig, url_imagem_publica, link_oferta=None):
+def postar_no_instagram(ig_user_id, page_token, texto_ig, lista_imagens, api_key_imgbb, link_oferta=None):
     if not ig_user_id or not page_token:
         return False, "ID da Conta do Instagram ou Token não configurados."
-    if not url_imagem_publica:
-        return False, "O Instagram exige uma URL de imagem pública para postagem via API."
+    if not lista_imagens:
+        return False, "O Instagram exige ao menos uma imagem selecionada."
+    if not api_key_imgbb:
+        return False, "A chave de API do ImgBB não foi preenchida no código."
+    
     try:
+        img_processada = processar_imagem_automaticamente(lista_imagens[0])
+        
+        url_imagem_publica = subir_imagem_para_imgbb(img_processada, api_key_imgbb)
+        if not url_imagem_publica:
+            return False, "Falha ao gerar URL pública da imagem no ImgBB."
+
         legenda_limpa = texto_ig.replace("<b>", "").replace("</b>", "").replace("<code>", "").replace("</code>", "")
         if link_oferta and link_oferta.strip():
             legenda_limpa += f"\n\nLink: {link_oferta.strip()}"
@@ -227,7 +257,7 @@ with col2:
     link_afiliado = st.text_input("Link da Oferta / Afiliado", placeholder="https://...")
     
     imagens_upload = st.file_uploader(
-        "📸 Selecionar Imagens da Galeria (Para Facebook e Telegram)", 
+        "📸 Selecionar Imagens da Galeria (Facebook, Telegram e Instagram)", 
         type=["jpg", "jpeg", "png", "webp"],
         accept_multiple_files=True
     )
@@ -239,7 +269,6 @@ with col2:
             cols_img[idx % 4].image(img, use_container_width=True)
 
 descricao_extra = st.text_area("Observações / Detalhes Adicionais (Opcional)", placeholder="Ex: Frete Grátis", height=70)
-url_imagem_ig_manual = st.text_input("🔗 URL Pública da Imagem (Exigido apenas para o Instagram)", placeholder="Cole o link direto da imagem na web...")
 
 # Montagem do texto base
 texto_gerado = f"🔥 <b>{titulo_produto if titulo_produto else 'OFERTA IMPERDÍVEL'}</b>\n\n"
@@ -266,7 +295,7 @@ with tab_redes:
     with col_check2:
         enviar_tg = st.checkbox("Telegram (Álbum)", value=True)
     with col_check3:
-        enviar_ig = st.checkbox("Instagram", value=False)
+        enviar_ig = st.checkbox("Instagram", value=True)
 
     st.markdown("---")
     if st.button("🚀 Postar Oferta nos Canais Selecionados", type="primary", use_container_width=True):
@@ -290,10 +319,12 @@ with tab_redes:
                     st.error(f"❌ **Telegram:** {msg_tg}")
 
             if enviar_ig:
-                if not INSTAGRAM_USER_ID_FIXO:
-                    st.error("❌ **Instagram:** Defina o `INSTAGRAM_USER_ID_FIXO` no código.")
+                if not IMGBB_API_KEY_FIXO:
+                    st.error("❌ **Instagram:** Chave do ImgBB ausente.")
+                elif not imagens_upload:
+                    st.warning("⚠️ **Instagram:** Selecione ao menos uma imagem para enviar.")
                 else:
-                    st_ig, msg_ig = postar_no_instagram(INSTAGRAM_USER_ID_FIXO, FB_PAGE_TOKEN_FIXO, texto_gerado, url_imagem_ig_manual, link_afiliado)
+                    st_ig, msg_ig = postar_no_instagram(INSTAGRAM_USER_ID_FIXO, FB_PAGE_TOKEN_FIXO, texto_gerado, imagens_upload, IMGBB_API_KEY_FIXO, link_afiliado)
                     if st_ig:
                         st.success(f"✅ **Instagram:** {msg_ig}")
                     else:
