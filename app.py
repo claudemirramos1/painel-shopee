@@ -2,9 +2,8 @@ import streamlit as st
 import requests
 
 # ==========================================
-# CONFIGURAÇÕES FIXAS (SEM PRECISAR DIGITAR)
+# CONFIGURAÇÕES FIXAS
 # ==========================================
-# Seus dados configurados diretamente no código
 FB_PAGE_ID_FIXO = "1214303865109377"
 FB_PAGE_TOKEN_FIXO = "EAAPFihJ9FJcBSWSZBdne8dP0ngvvIbl91jPCzrVi7Ub7HdOIMK6guYcr3ZAA58x2ppYVZBSuwZC9IMx1wMPpBKyAtTkSz5uqi8O4B6VCGKa943WRBVclQNizD2gbKUkckX5TIU3KonoYk7ecTwTpuZARrXd5m1ur14hxYf5qGjNYOw8L53ELcVqdCPr5jFeZCfC7w1dZAst"
 
@@ -77,26 +76,46 @@ def postar_no_telegram(token, chat_id, texto, lista_imagens):
         return False, f"Falha no Telegram: {str(e)}"
 
 
-def postar_no_facebook(page_id, page_token, texto_fb, link_oferta=None):
+def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta=None):
     if not page_id or not page_token:
         return False, "ID da Página ou Token de Acesso do FB não informados."
     try:
         # Remove tags HTML para enviar texto limpo ao Facebook
         legenda_limpa = texto_fb.replace("<b>", "").replace("</b>", "").replace("<code>", "").replace("</code>", "")
-        url = f"https://graph.facebook.com/v26.0/{page_id}/feed"
         
-        payload = {
-            "message": legenda_limpa,
-            "access_token": page_token
-        }
-        if link_oferta and link_oferta.strip():
-            payload["link"] = link_oferta.strip()
+        # Se houver imagem anexada, publica na rota /photos
+        if lista_imagens and len(lista_imagens) > 0:
+            img = lista_imagens[0]
+            img.seek(0)
+            url = f"https://graph.facebook.com/v26.0/{page_id}/photos"
             
-        response = requests.post(url, data=payload, timeout=15)
+            files = {
+                "source": (img.name, img.getvalue(), img.type)
+            }
+            payload = {
+                "caption": legenda_limpa,
+                "access_token": page_token
+            }
+            if link_oferta and link_oferta.strip():
+                # Nota: Na API de fotos do FB, o link opcional pode ir na legenda ou não ser aceito simultaneamente dependendo da regra, mas a caption já tem o link.
+                pass
+                
+            response = requests.post(url, data=payload, files=files, timeout=30)
+        else:
+            # Caso não tenha imagem, posta como texto/link normal no /feed
+            url = f"https://graph.facebook.com/v26.0/{page_id}/feed"
+            payload = {
+                "message": legenda_limpa,
+                "access_token": page_token
+            }
+            if link_oferta and link_oferta.strip():
+                payload["link"] = link_oferta.strip()
+            response = requests.post(url, data=payload, timeout=15)
+            
         res_data = response.json()
         
         if "id" in res_data or "post_id" in res_data:
-            return True, "Publicado no Facebook!"
+            return True, "Publicado no Facebook com foto!" if (lista_imagens and len(lista_imagens) > 0) else "Publicado no Facebook!"
         else:
             err = res_data.get("error", {})
             return False, f"Erro Facebook: {err.get('message', 'Erro desconhecido')}"
@@ -176,7 +195,6 @@ with col_check2:
 with col_check3:
     enviar_wsp = st.checkbox("WhatsApp", value=False)
 
-# Campo opcional para WhatsApp apenas caso queira usar
 if enviar_wsp:
     wsp_webhook_url = st.text_input("URL do Webhook / API WhatsApp", placeholder="https://sua-api-whatsapp.com/send")
 else:
@@ -192,7 +210,7 @@ if st.button("🚀 Postar Oferta em Todos os Canais", type="primary", use_contai
         
         # Facebook
         if enviar_fb:
-            st_fb, msg_fb = postar_no_facebook(FB_PAGE_ID_FIXO, FB_PAGE_TOKEN_FIXO, texto_gerado, link_afiliado)
+            st_fb, msg_fb = postar_no_facebook(FB_PAGE_ID_FIXO, FB_PAGE_TOKEN_FIXO, texto_gerado, imagens_upload, link_afiliado)
             if st_fb:
                 st.success(f"✅ **Facebook:** {msg_fb}")
             else:
