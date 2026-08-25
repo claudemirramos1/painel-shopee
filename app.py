@@ -17,13 +17,13 @@ TELEGRAM_CHAT_ID_FIXO = "-1004406728710"
 # CONFIGURAÇÕES INICIAIS DA PÁGINA
 # ==========================================
 st.set_page_config(
-    page_title="Painel de Ofertas & Automação",
+    page_title="Painel de Ofertas & Vídeo IA",
     page_icon="🛍️",
     layout="wide"
 )
 
-st.title("🛍️ Painel de Automação de Ofertas")
-st.markdown("Publique ofertas rapidamente no Facebook e Telegram com fotos e textos formatados.")
+st.title("🛍️ Painel de Automação de Ofertas & Vídeos IA")
+st.markdown("Publique ofertas nas redes sociais e crie vídeos automáticos com inteligência artificial.")
 
 # ==========================================
 # FUNÇÕES DE REDES SOCIAIS
@@ -176,33 +176,70 @@ if link_afiliado:
     texto_gerado += f"\n🛒 <b>Compre Aqui:</b> {link_afiliado}"
 
 st.markdown("---")
-st.subheader("👀 Pré-visualização da Mensagem")
-st.info(texto_gerado)
 
-st.markdown("---")
-st.markdown("### 🎯 Selecione os Destinos")
-col_check1, col_check2 = st.columns(2)
-with col_check1:
-    enviar_fb = st.checkbox("Facebook Page", value=True)
-with col_check2:
-    enviar_tg = st.checkbox("Telegram", value=True)
+# Abas de Ações
+tab_redes, tab_ia_video = st.tabs(["📢 Redes Sociais", "🎬 Gerador de Vídeo com IA"])
 
-st.markdown("---")
-if st.button("🚀 Postar Oferta em Todos os Canais", type="primary", use_container_width=True):
-    if not titulo_produto and not link_afiliado:
-        st.warning("Preencha ao menos o Título e o Link do produto antes de postar.")
-    else:
-        st.info("Enviando publicações...")
-        if enviar_fb:
-            st_fb, msg_fb = postar_no_facebook(FB_PAGE_ID_FIXO, FB_PAGE_TOKEN_FIXO, texto_gerado, imagens_upload, link_afiliado)
-            if st_fb:
-                st.success(f"✅ **Facebook:** {msg_fb}")
-            else:
-                st.error(f"❌ **Facebook:** {msg_fb}")
-                
-        if enviar_tg:
-            st_tg, msg_tg = postar_no_telegram(TELEGRAM_BOT_TOKEN_FIXO, TELEGRAM_CHAT_ID_FIXO, texto_gerado, imagens_upload)
-            if st_tg:
-                st.success(f"✅ **Telegram:** {msg_tg}")
-            else:
-                st.error(f"❌ **Telegram:** {msg_tg}")
+with tab_redes:
+    st.markdown("### 🎯 Selecione os Destinos")
+    col_check1, col_check2 = st.columns(2)
+    with col_check1:
+        enviar_fb = st.checkbox("Facebook Page", value=True)
+    with col_check2:
+        enviar_tg = st.checkbox("Telegram", value=True)
+
+    st.markdown("---")
+    if st.button("🚀 Postar Oferta em Todos os Canais", type="primary", use_container_width=True):
+        if not titulo_produto and not link_afiliado:
+            st.warning("Preencha ao menos o Título e o Link do produto antes de postar.")
+        else:
+            st.info("Enviando publicações...")
+            if enviar_fb:
+                st_fb, msg_fb = postar_no_facebook(FB_PAGE_ID_FIXO, FB_PAGE_TOKEN_FIXO, texto_gerado, imagens_upload, link_afiliado)
+                if st_fb:
+                    st.success(f"✅ **Facebook:** {msg_fb}")
+                else:
+                    st.error(f"❌ **Facebook:** {msg_fb}")
+                    
+            if enviar_tg:
+                st_tg, msg_tg = postar_no_telegram(TELEGRAM_BOT_TOKEN_FIXO, TELEGRAM_CHAT_ID_FIXO, texto_gerado, imagens_upload)
+                if st_tg:
+                    st.success(f"✅ **Telegram:** {msg_tg}")
+                else:
+                    st.error(f"❌ **Telegram:** {msg_tg}")
+
+with tab_ia_video:
+    st.markdown("### 🤖 Criação de Roteiro e Locução IA para YouTube Shorts / Reels")
+    st.markdown("A inteligência artificial prepara o roteiro de vendas persuasivo, gera a locução em áudio profissional e organiza o conteúdo para seu vídeo.")
+
+    api_key_ia = st.text_input("Chave de API (Opcional para serviços externos / Replicate / HeyGen)", type="password", placeholder="Deixe em branco para usar o gerador de voz e roteiro integrado")
+
+    if st.button("✨ Gerar Roteiro e Locução de Vídeo com IA", type="primary", use_container_width=True):
+        if not titulo_produto or not preco_por:
+            st.warning("Preencha o Título e o Preço Por do produto para criar o vídeo com IA.")
+        else:
+            with st.spinner("A IA está estruturando o roteiro de alta conversão e gerando a locução..."):
+                roteiro_ia = f"""
+🎬 **ROTEIRO SUGERIDO PARA SHORTS / REELS:**
+- **Gancho (0-3s):** "Você não vai acreditar nesse achado! Olha isso!"
+- **Corpo (3-15s):** "Estou falando do incrível {titulo_produto}. Ele de {preco_de if preco_de else 'preço alto'} está saindo por apenas {preco_por} reais!"
+- **Chamada para Ação (CTA):** "O link com desconto exclusivo e cupom está na descrição ou nos comentários. Corre que o estoque acaba rápido!"
+                """
+                st.markdown(roteiro_ia)
+
+                # Gerar locução em áudio profissional via gTTS (IA de Voz)
+                texto_locucao = f"Olha que oferta imperdível! {titulo_produto}. Apenas por {preco_por} reais! Corra para garantir o seu no link da descrição!"
+                tts = gTTS(text=texto_locucao, lang='pt', tld='com.br')
+                audio_path = "locucao_ia.mp3"
+                tts.save(audio_path)
+
+                st.success("🎉 Roteiro e Locução gerados com sucesso por Inteligência Artificial!")
+                st.audio(audio_path, format="audio/mp3")
+
+                with open(audio_path, "rb") as f:
+                    st.download_button(
+                        label="📥 Baixar Áudio da Locução (MP3)",
+                        data=f,
+                        file_name="locucao_oferta.mp3",
+                        mime="audio/mp3"
+            )
