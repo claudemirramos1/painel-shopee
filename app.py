@@ -33,7 +33,7 @@ fb_page_token = st.sidebar.text_input(
     key="fb_page_token"
 )
 
-# WhatsApp (Webhook ou API)
+# WhatsApp
 st.sidebar.subheader("WhatsApp")
 wsp_webhook_url = st.sidebar.text_input("URL do Webhook / API WhatsApp", key="wsp_url", placeholder="https://sua-api-whatsapp.com/send")
 
@@ -48,9 +48,9 @@ def postar_no_telegram(token, chat_id, texto, arquivo_imagem):
         if arquivo_imagem:
             arquivo_imagem.seek(0)
             url = f"https://api.telegram.org/bot{token}/sendPhoto"
-            files = {"photo": (arquivo_imagem.name, arquivo_imagem, arquivo_imagem.type)}
+            files = {"photo": (arquivo_imagem.name, arquivo_imagem.getvalue(), arquivo_imagem.type)}
             data = {"chat_id": chat_id, "caption": texto, "parse_mode": "HTML"}
-            response = requests.post(url, data=data, files=files, timeout=15)
+            response = requests.post(url, data=data, files=files, timeout=20)
         else:
             url = f"https://api.telegram.org/bot{token}/sendMessage"
             data = {"chat_id": chat_id, "text": texto, "parse_mode": "HTML"}
@@ -62,26 +62,38 @@ def postar_no_telegram(token, chat_id, texto, arquivo_imagem):
         return False, f"Falha no Telegram: {str(e)}"
 
 
-def postar_no_facebook(page_id, page_token, texto, arquivo_imagem):
+def postar_no_facebook(page_id, page_token, texto_fb, arquivo_imagem):
     if not page_id or not page_token:
         return False, "ID da Página ou Token de Acesso do FB não informados."
     try:
+        # Remove caracteres markdown que causam erros de sintaxe no Graph API
+        legenda_limpa = texto_fb.replace("**", "").replace("`", "")
+
         if arquivo_imagem:
             arquivo_imagem.seek(0)
             url = f"https://graph.facebook.com/v26.0/{page_id}/photos"
-            files = {"source": (arquivo_imagem.name, arquivo_imagem, arquivo_imagem.type)}
-            data = {"caption": texto, "access_token": page_token}
-            response = requests.post(url, data=data, files=files, timeout=20)
+            files = {
+                "source": (arquivo_imagem.name, arquivo_imagem.getvalue(), arquivo_imagem.type)
+            }
+            params = {
+                "caption": legenda_limpa,
+                "access_token": page_token
+            }
+            response = requests.post(url, params=params, files=files, timeout=30)
         else:
             url = f"https://graph.facebook.com/v26.0/{page_id}/feed"
-            data = {"message": texto, "access_token": page_token}
-            response = requests.post(url, data=data, timeout=10)
+            payload = {
+                "message": legenda_limpa,
+                "access_token": page_token
+            }
+            response = requests.post(url, data=payload, timeout=15)
             
         res_data = response.json()
         if "id" in res_data or "post_id" in res_data:
-            return True, "Publicado na Página do Facebook!"
+            return True, "Publicado com sucesso na Página do Facebook!"
         else:
-            return False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro desconhecido')}"
+            err = res_data.get("error", {})
+            return False, f"Erro Facebook: {err.get('message', 'Erro desconhecido')}"
     except Exception as e:
         return False, f"Falha no Facebook: {str(e)}"
 
@@ -115,20 +127,16 @@ with col1:
 
 with col2:
     link_afiliado = st.text_input("Link da Oferta / Afiliado", placeholder="https://...")
-    
-    # Upload direto da galeria/arquivo
     imagem_upload = st.file_uploader(
         "📸 Selecionar Imagem da Galeria", 
         type=["jpg", "jpeg", "png", "webp"]
     )
-    
     if imagem_upload:
         st.image(imagem_upload, caption="Pré-visualização da imagem", width=150)
 
-# Descrição adicional opcional
 descricao_extra = st.text_area("Observações / Detalhes Adicionais (Opcional)", placeholder="Ex: Frete Grátis para assinantes Prime", height=70)
 
-# Montagem automática da mensagem
+# Montagem das versões de texto
 texto_gerado = f"🔥 **{titulo_produto if titulo_produto else 'OFERTA IMPERDÍVEL'}**\n\n"
 if preco_de:
     texto_gerado += f"❌ De: R$ {preco_de}\n"
