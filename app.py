@@ -6,13 +6,16 @@ from PIL import Image, ImageOps, ImageEnhance
 import io
 
 # ==========================================
-# CONFIGURAÇÕES FIXAS
+# CONFIGURAÇÕES FIXAS (Insira seus dados aqui)
 # ==========================================
 FB_PAGE_ID_FIXO = "1214303865109377"
 FB_PAGE_TOKEN_FIXO = "EAAPFihJ9FJcBSWSZBdne8dP0ngvvIbl91jPCzrVi7Ub7HdOIMK6guYcr3ZAA58x2ppYVZBSuwZC9IMx1wMPpBKyAtTkSz5uqi8O4B6VCGKa943WRBVclQNizD2gbKUkckX5TIU3KonoYk7ecTwTpuZARrXd5m1ur14hxYf5qGjNYOw8L53ELcVqdCPr5jFeZCfC7w1dZAst"
 
 TELEGRAM_BOT_TOKEN_FIXO = "8353706833:AAHhyPqgeNezFY1X4NTMegpaPf_UdVOBs04"
 TELEGRAM_CHAT_ID_FIXO = "-1004406728710"
+
+# Insira aqui o IG User ID que você descobriu na API Graph da Meta
+INSTAGRAM_USER_ID_FIXO = ""  
 
 # ==========================================
 # CONFIGURAÇÕES INICIAIS DA PÁGINA
@@ -23,8 +26,8 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🛍️ Painel de Automação de Ofertas (Facebook & Telegram)")
-st.markdown("Publique ofertas com várias fotos tratadas em alta resolução (1080x1350) e links estruturados.")
+st.title("🛍️ Painel de Automação de Ofertas (Facebook, Telegram & Instagram)")
+st.markdown("Publique ofertas com fotos tratadas em alta resolução (1080x1350) e automação completa.")
 
 # ==========================================
 # FUNÇÃO DE PROCESSAMENTO DE IMAGEM
@@ -104,7 +107,7 @@ def postar_no_telegram(token, chat_id, texto, lista_imagens):
             }
             response = requests.post(url, data=data, files=files, timeout=30)
             res_data = response.json()
-            return (True, "Álbum com múltiplas fotos publicado no Telegram!") if res_data.get("ok") else (False, f"Erro Telegram: {res_data.get('description')}")
+            return (True, "Álbum publicado no Telegram!") if res_data.get("ok") else (False, f"Erro Telegram: {res_data.get('description')}")
 
     except Exception as e:
         return False, f"Falha no Telegram: {str(e)}"
@@ -112,7 +115,7 @@ def postar_no_telegram(token, chat_id, texto, lista_imagens):
 
 def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta=None):
     if not page_id or not page_token:
-        return False, "ID da Página ou Token de Acesso do FB não informados."
+        return False, "ID da Página ou Token do FB não informados."
     try:
         legenda_limpa = texto_fb.replace("<b>", "").replace("</b>", "").replace("<code>", "").replace("</code>", "")
         imagens_processadas = [processar_imagem_automaticamente(img) for img in lista_imagens] if lista_imagens else []
@@ -136,7 +139,7 @@ def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta
                 payload["link"] = link_oferta.strip()
             response = requests.post(url, data=payload, files=files, timeout=30)
             res_data = response.json()
-            return (True, "Publicado no Facebook com foto em alta resolução!") if ("id" in res_data or "post_id" in res_data) else (False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro')}")
+            return (True, "Publicado no Facebook em HD!") if ("id" in res_data or "post_id" in res_data) else (False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro')}")
 
         else:
             attached_media_list = []
@@ -150,7 +153,7 @@ def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta
                 if "id" in data_upload:
                     attached_media_list.append({"media_fbid": data_upload["id"]})
                 else:
-                    return False, f"Erro ao enviar foto do carrossel: {data_upload.get('error', {}).get('message', 'Erro')}"
+                    return False, f"Erro ao enviar foto: {data_upload.get('error', {}).get('message', 'Erro')}"
             
             url_feed = f"https://graph.facebook.com/v26.0/{page_id}/feed"
             payload_feed = {
@@ -163,10 +166,50 @@ def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta
                 
             response = requests.post(url_feed, data=payload_feed, timeout=30)
             res_data = response.json()
-            return (True, "Publicado no Facebook com múltiplas fotos em alta resolução!") if ("id" in res_data or "post_id" in res_data) else (False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro')}")
+            return (True, "Publicado no Facebook com múltiplas fotos!") if ("id" in res_data or "post_id" in res_data) else (False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro')}")
 
     except Exception as e:
         return False, f"Falha no Facebook: {str(e)}"
+
+
+def postar_no_instagram(ig_user_id, page_token, texto_ig, url_imagem_publica, link_oferta=None):
+    if not ig_user_id or not page_token:
+        return False, "ID da Conta do Instagram ou Token não configurados."
+    if not url_imagem_publica:
+        return False, "O Instagram exige uma URL de imagem pública para postagem via API."
+    try:
+        legenda_limpa = texto_ig.replace("<b>", "").replace("</b>", "").replace("<code>", "").replace("</code>", "")
+        if link_oferta and link_oferta.strip():
+            legenda_limpa += f"\n\nLink: {link_oferta.strip()}"
+
+        # Passo 1: Criar o contêiner de mídia no Instagram
+        url_container = f"https://graph.facebook.com/v26.0/{ig_user_id}/media"
+        payload_container = {
+            "image_url": url_imagem_publica,
+            "caption": legenda_limpa,
+            "access_token": page_token
+        }
+        resp_c = requests.post(url_container, data=payload_container, timeout=20)
+        data_c = resp_c.json()
+
+        if "id" in data_c:
+            creation_id = data_c["id"]
+            
+            # Passo 2: Publicar o contêiner
+            url_publish = f"https://graph.facebook.com/v26.0/{ig_user_id}/media_publish"
+            payload_publish = {
+                "creation_id": creation_id,
+                "access_token": page_token
+            }
+            resp_p = requests.post(url_publish, data=payload_publish, timeout=20)
+            data_p = resp_p.json()
+
+            return (True, "Publicado no Instagram com sucesso!") if "id" in data_p else (False, f"Erro ao publicar: {data_p.get('error', {}).get('message', 'Erro')}")
+        else:
+            return False, f"Erro ao criar container: {data_c.get('error', {}).get('message', 'Erro')}"
+
+    except Exception as e:
+        return False, f"Falha no Instagram: {str(e)}"
 
 # ==========================================
 # INTERFACE PRINCIPAL
@@ -198,6 +241,7 @@ with col2:
             cols_img[idx % 4].image(img, use_container_width=True)
 
 descricao_extra = st.text_area("Observações / Detalhes Adicionais (Opcional)", placeholder="Ex: Frete Grátis para assinantes Prime", height=70)
+url_imagem_ig_manual = st.text_input("🔗 URL Pública da Imagem (Necessário apenas para postar no Instagram)", placeholder="Cole aqui o link direto da imagem na web...")
 
 # Montagem do texto das publicações
 texto_gerado = f"🔥 <b>{titulo_produto if titulo_produto else 'OFERTA IMPERDÍVEL'}</b>\n\n"
@@ -219,18 +263,20 @@ tab_redes, tab_roteiro_locucao = st.tabs(["📢 Redes Sociais", "🎙️ Roteiro
 
 with tab_redes:
     st.markdown("### 🎯 Selecione os Destinos")
-    col_check1, col_check2 = st.columns(2)
+    col_check1, col_check2, col_check3 = st.columns(3)
     with col_check1:
-        enviar_fb = st.checkbox("Facebook Page (HD com Múltiplas Fotos)", value=True)
+        enviar_fb = st.checkbox("Facebook Page (HD)", value=True)
     with col_check2:
-        enviar_tg = st.checkbox("Telegram (Álbum com Múltiplas Fotos)", value=True)
+        enviar_tg = st.checkbox("Telegram (Álbum)", value=True)
+    with col_check3:
+        enviar_ig = st.checkbox("Instagram", value=False)
 
     st.markdown("---")
     if st.button("🚀 Postar Oferta em Todos os Canais", type="primary", use_container_width=True):
         if not titulo_produto and not link_afiliado:
             st.warning("Preencha ao menos o Título e o Link do produto antes de postar.")
         else:
-            st.info("Processando imagens em alta resolução e publicando...")
+            st.info("Processando publicações...")
             if enviar_fb:
                 st_fb, msg_fb = postar_no_facebook(FB_PAGE_ID_FIXO, FB_PAGE_TOKEN_FIXO, texto_gerado, imagens_upload, link_afiliado)
                 if st_fb:
@@ -244,6 +290,16 @@ with tab_redes:
                     st.success(f"✅ **Telegram:** {msg_tg}")
                 else:
                     st.error(f"❌ **Telegram:** {msg_tg}")
+
+            if enviar_ig:
+                if not INSTAGRAM_USER_ID_FIXO:
+                    st.error("❌ **Instagram:** Defina o `INSTAGRAM_USER_ID_FIXO` no código.")
+                else:
+                    st_ig, msg_ig = postar_no_instagram(INSTAGRAM_USER_ID_FIXO, FB_PAGE_TOKEN_FIXO, texto_gerado, url_imagem_ig_manual, link_afiliado)
+                    if st_ig:
+                        st.success(f"✅ **Instagram:** {msg_ig}")
+                    else:
+                        st.error(f"❌ **Instagram:** {msg_ig}")
 
 with tab_roteiro_locucao:
     st.markdown("### 🎙️ Gerador de Roteiro Comercial & Áudio de Locução")
@@ -268,4 +324,4 @@ with tab_roteiro_locucao:
                         data=f,
                         file_name="locucao_oferta.mp3",
                         mime="audio/mp3"
-                    )
+    )
