@@ -1,8 +1,9 @@
 import streamlit as st
 import requests
 import json
-import os
 from gtts import gTTS
+from PIL import Image, ImageOps
+import io
 
 # ==========================================
 # CONFIGURAÇÕES FIXAS
@@ -17,13 +18,53 @@ TELEGRAM_CHAT_ID_FIXO = "-1004406728710"
 # CONFIGURAÇÕES INICIAIS DA PÁGINA
 # ==========================================
 st.set_page_config(
-    page_title="Painel de Ofertas & Vídeo IA",
+    page_title="Painel de Ofertas & Redes Sociais",
     page_icon="🛍️",
     layout="wide"
 )
 
-st.title("🛍️ Painel de Automação de Ofertas & Vídeos IA")
-st.markdown("Publique ofertas nas redes sociais e crie vídeos automáticos com inteligência artificial.")
+st.title("🛍️ Painel de Automação de Ofertas com Redimensionamento Inteligente")
+st.markdown("Publique ofertas com imagens otimizadas para o Facebook e Telegram sem distorções.")
+
+# ==========================================
+# FUNÇÃO DE OTIMIZAÇÃO DE IMAGEM PARA O FACEBOOK
+# ==========================================
+def otimizar_imagem_facebook(imagem_upload, target_size=(1080, 1080)):
+    """
+    Redimensiona e ajusta qualquer imagem para o tamanho ideal do Facebook (1080x1080)
+    sem distorcer, adicionando barras proporcionais se necessário ou centralizando.
+    """
+    try:
+        img = Image.open(imagem_upload)
+        # Converte para RGB caso seja PNG com transparência
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+            
+        # Cria uma imagem de fundo branco no tamanho ideal do Facebook
+        novo_fundo = Image.new("RGB", target_size, (255, 255, 255))
+        
+        # Redimensiona mantendo a proporção original para caber dentro de 1080x1080
+        img.thumbnail(target_size, Image.Resampling.LANCZOS)
+        
+        # Calcula a posição centralizada para colar a foto no fundo branco
+        x = (target_size[0] - img.width) // 2
+        y = (target_size[1] - img.height) // 2
+        
+        novo_fundo.paste(img, (x, y))
+        
+        # Salva em um buffer de memória em formato JPEG de alta qualidade
+        output_buffer = io.BytesIO()
+        novo_fundo.save(output_buffer, format="JPEG", quality=95)
+        output_buffer.seek(0)
+        
+        # Cria um objeto compatível com os arquivos enviados do Streamlit
+        output_buffer.name = "imagem_otimizada_fb.jpg"
+        output_buffer.type = "image/jpeg"
+        return output_buffer
+    except Exception as e:
+        # Se ocorrer qualquer erro, retorna a imagem original tratada
+        imagem_upload.seek(0)
+        return imagem_upload
 
 # ==========================================
 # FUNÇÕES DE REDES SOCIAIS
@@ -85,7 +126,10 @@ def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta
     try:
         legenda_limpa = texto_fb.replace("<b>", "").replace("</b>", "").replace("<code>", "").replace("</code>", "")
         
-        if not lista_imagens or len(lista_imagens) == 0:
+        # Otimiza todas as imagens antes de enviar para o Facebook para garantir máxima qualidade sem distorção
+        imagens_otimizadas = [otimizar_imagem_facebook(img) for img in lista_imagens] if lista_imagens else []
+        
+        if not imagens_otimizadas or len(imagens_otimizadas) == 0:
             url = f"https://graph.facebook.com/v26.0/{page_id}/feed"
             payload = {"message": legenda_limpa, "access_token": page_token}
             if link_oferta and link_oferta.strip():
@@ -94,19 +138,19 @@ def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta
             res_data = response.json()
             return (True, "Publicado no Facebook!") if ("id" in res_data or "post_id" in res_data) else (False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro')}")
 
-        elif len(lista_imagens) == 1:
-            img = lista_imagens[0]
+        elif len(imagens_otimizadas) == 1:
+            img = imagens_otimizadas[0]
             img.seek(0)
             url = f"https://graph.facebook.com/v26.0/{page_id}/photos"
             files = {"source": (img.name, img.getvalue(), img.type)}
             payload = {"caption": legenda_limpa, "access_token": page_token}
             response = requests.post(url, data=payload, files=files, timeout=30)
             res_data = response.json()
-            return (True, "Publicado no Facebook com foto!") if ("id" in res_data or "post_id" in res_data) else (False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro')}")
+            return (True, "Publicado no Facebook com foto otimizada!") if ("id" in res_data or "post_id" in res_data) else (False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro')}")
 
         else:
             attached_media_list = []
-            for img in lista_imagens:
+            for img in imagens_otimizadas:
                 img.seek(0)
                 url_upload = f"https://graph.facebook.com/v26.0/{page_id}/photos"
                 files = {"source": (img.name, img.getvalue(), img.type)}
@@ -126,7 +170,7 @@ def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta
             }
             response = requests.post(url_feed, data=payload_feed, timeout=30)
             res_data = response.json()
-            return (True, "Álbum publicado no Facebook com sucesso!") if ("id" in res_data or "post_id" in res_data) else (False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro')}")
+            return (True, "Álbum publicado no Facebook com fotos otimizadas!") if ("id" in res_data or "post_id" in res_data) else (False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro')}")
 
     except Exception as e:
         return False, f"Falha no Facebook: {str(e)}"
@@ -178,13 +222,13 @@ if link_afiliado:
 st.markdown("---")
 
 # Abas de Ações
-tab_redes, tab_ia_video = st.tabs(["📢 Redes Sociais", "🎬 Gerador de Vídeo com IA"])
+tab_redes, tab_roteiro_locucao = st.tabs(["📢 Redes Sociais", "🎙️ Roteiro & Locução IA"])
 
 with tab_redes:
     st.markdown("### 🎯 Selecione os Destinos")
     col_check1, col_check2 = st.columns(2)
     with col_check1:
-        enviar_fb = st.checkbox("Facebook Page", value=True)
+        enviar_fb = st.checkbox("Facebook Page (Com Otimização Automática)", value=True)
     with col_check2:
         enviar_tg = st.checkbox("Telegram", value=True)
 
@@ -193,7 +237,7 @@ with tab_redes:
         if not titulo_produto and not link_afiliado:
             st.warning("Preencha ao menos o Título e o Link do produto antes de postar.")
         else:
-            st.info("Enviando publicações...")
+            st.info("Otimizando imagens e enviando publicações...")
             if enviar_fb:
                 st_fb, msg_fb = postar_no_facebook(FB_PAGE_ID_FIXO, FB_PAGE_TOKEN_FIXO, texto_gerado, imagens_upload, link_afiliado)
                 if st_fb:
@@ -208,37 +252,26 @@ with tab_redes:
                 else:
                     st.error(f"❌ **Telegram:** {msg_tg}")
 
-with tab_ia_video:
-    st.markdown("### 🤖 Criação de Roteiro e Locução IA para YouTube Shorts / Reels")
-    st.markdown("A inteligência artificial prepara o roteiro de vendas persuasivo, gera a locução em áudio profissional e organiza o conteúdo para seu vídeo.")
-
-    api_key_ia = st.text_input("Chave de API (Opcional para serviços externos / Replicate / HeyGen)", type="password", placeholder="Deixe em branco para usar o gerador de voz e roteiro integrado")
-
-    if st.button("✨ Gerar Roteiro e Locução de Vídeo com IA", type="primary", use_container_width=True):
+with tab_roteiro_locucao:
+    st.markdown("### 🎙️ Gerador de Roteiro Comercial & Áudio de Locução")
+    
+    if st.button("✨ Gerar Roteiro e Áudio da Locução", type="primary", use_container_width=True):
         if not titulo_produto or not preco_por:
-            st.warning("Preencha o Título e o Preço Por do produto para criar o vídeo com IA.")
+            st.warning("Preencha ao menos o Título e o Preço Por para gerar o roteiro e a locução.")
         else:
-            with st.spinner("A IA está estruturando o roteiro de alta conversão e gerando a locução..."):
-                roteiro_ia = f"""
-🎬 **ROTEIRO SUGERIDO PARA SHORTS / REELS:**
-- **Gancho (0-3s):** "Você não vai acreditar nesse achado! Olha isso!"
-- **Corpo (3-15s):** "Estou falando do incrível {titulo_produto}. Ele de {preco_de if preco_de else 'preço alto'} está saindo por apenas {preco_por} reais!"
-- **Chamada para Ação (CTA):** "O link com desconto exclusivo e cupom está na descrição ou nos comentários. Corre que o estoque acaba rápido!"
-                """
-                st.markdown(roteiro_ia)
+            with st.spinner("Sintetizando locução profissional..."):
+                texto_fala = f"Olha que achado absurdo! {titulo_produto}. Ele está saindo por apenas {preco_por} reais! Corre pra garantir o seu no link da descrição!"
+                
+                tts = gTTS(text=texto_fala, lang='pt', tld='com.br')
+                audio_output_path = "locucao_oferta.mp3"
+                tts.save(audio_output_path)
 
-                # Gerar locução em áudio profissional via gTTS (IA de Voz)
-                texto_locucao = f"Olha que oferta imperdível! {titulo_produto}. Apenas por {preco_por} reais! Corra para garantir o seu no link da descrição!"
-                tts = gTTS(text=texto_locucao, lang='pt', tld='com.br')
-                audio_path = "locucao_ia.mp3"
-                tts.save(audio_path)
+                st.markdown("#### 🎧 Ouça a Locução Gerada:")
+                st.audio(audio_output_path, format="audio/mp3")
 
-                st.success("🎉 Roteiro e Locução gerados com sucesso por Inteligência Artificial!")
-                st.audio(audio_path, format="audio/mp3")
-
-                with open(audio_path, "rb") as f:
+                with open(audio_output_path, "rb") as f:
                     st.download_button(
-                        label="📥 Baixar Áudio da Locução (MP3)",
+                        label="📥 Baixar Arquivo de Áudio (MP3)",
                         data=f,
                         file_name="locucao_oferta.mp3",
                         mime="audio/mp3"
