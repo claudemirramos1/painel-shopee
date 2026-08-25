@@ -4,20 +4,6 @@ import json
 import os
 from gtts import gTTS
 
-# Importação blindada para o Streamlit Cloud
-try:
-    import moviepy.editor as mp
-    IMAGE_CLIP = mp.ImageClip
-    AUDIO_CLIP = mp.AudioFileClip
-    CONCAT_CLIPS = mp.concatenate_videoclips
-except Exception:
-    import moviepy.video.VideoClip as mp_vc
-    import moviepy.audio.io.AudioFileClip as mp_af
-    import moviepy.video.compositing.concatenate as mp_cc
-    IMAGE_CLIP = mp_vc.ImageClip
-    AUDIO_CLIP = mp_af.AudioFileClip
-    CONCAT_CLIPS = mp_cc.concatenate_videoclips
-
 # ==========================================
 # CONFIGURAÇÕES FIXAS
 # ==========================================
@@ -31,13 +17,13 @@ TELEGRAM_CHAT_ID_FIXO = "-1004406728710"
 # CONFIGURAÇÕES INICIAIS DA PÁGINA
 # ==========================================
 st.set_page_config(
-    page_title="Painel de Ofertas & Vídeos",
+    page_title="Painel de Ofertas & Automação",
     page_icon="🛍️",
     layout="wide"
 )
 
-st.title("🛍️ Painel de Automação de Ofertas & Vídeos")
-st.markdown("Publique ofertas nas redes e crie vídeos automáticos para o YouTube Shorts de forma gratuita.")
+st.title("🛍️ Painel de Automação de Ofertas")
+st.markdown("Publique ofertas rapidamente no Facebook e Telegram com fotos e textos formatados.")
 
 # ==========================================
 # FUNÇÕES DE REDES SOCIAIS
@@ -146,60 +132,6 @@ def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta
         return False, f"Falha no Facebook: {str(e)}"
 
 # ==========================================
-# FUNÇÃO DE GERAÇÃO DE VÍDEO AUTOMÁTICO
-# ==========================================
-
-def gerar_video_shorts(titulo, preco_por, lista_imagens):
-    try:
-        texto_fala = f"Olha que oferta imperdível! {titulo}. Apenas por {preco_por} reais! Corra para garantir o seu!"
-        
-        tts = gTTS(text=texto_fala, lang='pt', tld='com.br')
-        audio_path = "temp_audio.mp3"
-        tts.save(audio_path)
-        
-        audio_clip = AUDIO_CLIP(audio_path)
-        duracao_total = audio_clip.duration
-        
-        temp_img_paths = []
-        num_imagens = len(lista_imagens)
-        duracao_por_foto = max(duracao_total / num_imagens, 2.0)
-        
-        image_clips = []
-        for idx, img in enumerate(lista_imagens):
-            img_path = f"temp_img_{idx}.jpg"
-            with open(img_path, "wb") as f:
-                f.write(img.getbuffer())
-            temp_img_paths.append(img_path)
-            
-            clip = IMAGE_CLIP(img_path).set_duration(duracao_por_foto).resize(height=1920)
-            image_clips.append(clip)
-            
-        video_base = CONCAT_CLIPS(image_clips, method="compose")
-        video_final = video_base.set_audio(audio_clip)
-        
-        output_video_path = "shorts_oferta.mp4"
-        video_final.write_videofile(
-            output_video_path, 
-            fps=24, 
-            codec="libx264", 
-            audio_codec="aac",
-            preset="ultrafast",
-            logger=None
-        )
-        
-        audio_clip.close()
-        video_final.close()
-        
-        for p in temp_img_paths:
-            if os.path.exists(p):
-                os.remove(p)
-                
-        return True, output_video_path
-        
-    except Exception as e:
-        return False, str(e)
-
-# ==========================================
 # INTERFACE PRINCIPAL
 # ==========================================
 
@@ -248,57 +180,29 @@ st.subheader("👀 Pré-visualização da Mensagem")
 st.info(texto_gerado)
 
 st.markdown("---")
+st.markdown("### 🎯 Selecione os Destinos")
+col_check1, col_check2 = st.columns(2)
+with col_check1:
+    enviar_fb = st.checkbox("Facebook Page", value=True)
+with col_check2:
+    enviar_tg = st.checkbox("Telegram", value=True)
 
-tab_redes, tab_shorts = st.tabs(["📢 Redes Sociais", "🎬 Gerador de Shorts"])
-
-with tab_redes:
-    st.markdown("### 🎯 Selecione os Destinos")
-    col_check1, col_check2 = st.columns(2)
-    with col_check1:
-        enviar_fb = st.checkbox("Facebook Page", value=True)
-    with col_check2:
-        enviar_tg = st.checkbox("Telegram", value=True)
-
-    st.markdown("---")
-    if st.button("🚀 Postar Oferta em Todos os Canais", type="primary", use_container_width=True):
-        if not titulo_produto and not link_afiliado:
-            st.warning("Preencha ao menos o Título e o Link do produto antes de postar.")
-        else:
-            st.info("Enviando publicações...")
-            if enviar_fb:
-                st_fb, msg_fb = postar_no_facebook(FB_PAGE_ID_FIXO, FB_PAGE_TOKEN_FIXO, texto_gerado, imagens_upload, link_afiliado)
-                if st_fb:
-                    st.success(f"✅ **Facebook:** {msg_fb}")
-                else:
-                    st.error(f"❌ **Facebook:** {msg_fb}")
-                    
-            if enviar_tg:
-                st_tg, msg_tg = postar_no_telegram(TELEGRAM_BOT_TOKEN_FIXO, TELEGRAM_CHAT_ID_FIXO, texto_gerado, imagens_upload)
-                if st_tg:
-                    st.success(f"✅ **Telegram:** {msg_tg}")
-                else:
-                    st.error(f"❌ **Telegram:** {msg_tg}")
-
-with tab_shorts:
-    st.markdown("### 🎬 Criador Automático de Vídeo para YouTube Shorts / Reels")
-    st.markdown("Transforme as fotos e o preço do produto em um vídeo narrado automaticamente.")
-    
-    if st.button("⚡ Gerar Vídeo para Shorts Agora", type="primary", use_container_width=True):
-        if not titulo_produto or not preco_por or not imagens_upload:
-            st.warning("Para gerar o vídeo, preencha ao menos o Título, o Preço Por e selecione ao menos 1 imagem.")
-        else:
-            with st.spinner("Criando áudio falado, organizando fotos e renderizando o vídeo... Aguarde alguns segundos."):
-                sucesso, resultado = gerar_video_shorts(titulo_produto, preco_por, imagens_upload)
-                if sucesso:
-                    st.success("🎉 Vídeo gerado com sucesso!")
-                    st.video(resultado)
-                    
-                    with open(resultado, "rb") as file:
-                        st.download_button(
-                            label="📥 Baixar Vídeo MP4",
-                            data=file,
-                            file_name="shorts_oferta.mp4",
-                            mime="video/mp4"
-                        )
-                else:
-                    st.error(f"❌ Erro ao gerar vídeo: {resultado}")
+st.markdown("---")
+if st.button("🚀 Postar Oferta em Todos os Canais", type="primary", use_container_width=True):
+    if not titulo_produto and not link_afiliado:
+        st.warning("Preencha ao menos o Título e o Link do produto antes de postar.")
+    else:
+        st.info("Enviando publicações...")
+        if enviar_fb:
+            st_fb, msg_fb = postar_no_facebook(FB_PAGE_ID_FIXO, FB_PAGE_TOKEN_FIXO, texto_gerado, imagens_upload, link_afiliado)
+            if st_fb:
+                st.success(f"✅ **Facebook:** {msg_fb}")
+            else:
+                st.error(f"❌ **Facebook:** {msg_fb}")
+                
+        if enviar_tg:
+            st_tg, msg_tg = postar_no_telegram(TELEGRAM_BOT_TOKEN_FIXO, TELEGRAM_CHAT_ID_FIXO, texto_gerado, imagens_upload)
+            if st_tg:
+                st.success(f"✅ **Telegram:** {msg_tg}")
+            else:
+                st.error(f"❌ **Telegram:** {msg_tg}")
