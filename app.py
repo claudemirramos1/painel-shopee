@@ -341,7 +341,7 @@ with col3_right:
   if ct1.button("🚚 Frete Grátis"):
     adicionar_tag("🚚 Frete Grátis")
   if ct2.button("⚡ Relâmpago"):
-    adicionar_tag("⚡ Oferta Relâmpago")
+    adicionar_tag("⚡ Oferta")
   if ct3.button("⭐ Do Dia"):
     adicionar_tag("⭐ Oferta do Dia")
 
