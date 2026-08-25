@@ -1,6 +1,7 @@
 import json
 import requests
 import streamlit as st
+import streamlit.components.v1 as components
 
 st.set_page_config(
     page_title="Painel de Ofertas", page_icon="🛍️", layout="centered"
@@ -35,8 +36,10 @@ def send_album_to_telegram(token, chat_id, text, media_files):
     return response.json()
 
 
-st.title("🛍️ Painel de Ofertas (Telegram + WhatsApp)")
-st.write("Preencha a promoção para publicar no Telegram e formatar para o WhatsApp.")
+st.title("🛍️ Painel de Ofertas")
+st.write(
+    "Preencha a promoção para publicar no Telegram e compartilhar no WhatsApp."
+)
 
 st.sidebar.header("🔑 Configurações do Telegram")
 telegram_token = st.sidebar.text_input(
@@ -60,7 +63,9 @@ with st.form("offer_form"):
         accept_multiple_files=True,
     )
 
-    submit = st.form_submit_button("🚀 Enviar Telegram & Gerar WhatsApp")
+    submit = st.form_submit_button(
+        "🚀 Enviar Telegram & Preparar para WhatsApp"
+    )
 
 if submit:
     if not media_files:
@@ -68,15 +73,15 @@ if submit:
     elif not telegram_token:
         st.error("Cole o seu Bot Token na barra lateral!")
     else:
-        # Formatação para o Telegram (Markdown)
+        # Formatação para o Telegram
         cupom_tg = f"\n🏷️ Cupom: `{code}`" if code else ""
         caption_tg = f"🔥 *{title}*\n\n💰 Por apenas: *R$ {price}*{cupom_tg}\n\n👇 *Compre pelo link:*\n{affiliate_link}"
 
-        # Formatação para o WhatsApp (Negritos com *)
+        # Formatação para o WhatsApp
         cupom_wa = f"\n🏷️ Cupom: *{code}*" if code else ""
         caption_wa = f"🔥 *{title}*\n\n💰 Por apenas: *R$ {price}*{cupom_wa}\n\n👇 *Compre pelo link:*\n{affiliate_link}"
 
-        # Envio para o Telegram
+        # Envio automático para o Telegram
         res = send_album_to_telegram(
             telegram_token, telegram_chat_id, caption_tg, media_files
         )
@@ -84,11 +89,68 @@ if submit:
         if res.get("ok"):
             st.success("✅ Enviado para o Telegram com sucesso!")
         else:
-            st.error(f"❌ Erro ao enviar para o Telegram: {res.get('description')}")
+            st.error(f"❌ Erro no Telegram: {res.get('description')}")
 
-        # Exibição do texto formatado para o WhatsApp
-        st.subheader("📲 Texto Formatado para o WhatsApp")
-        st.code(caption_wa, language="markdown")
-        st.info(
-            "💡 **Dica:** Copie o texto acima e cole no seu Canal do WhatsApp junto com as fotos da promoção!"
+        st.subheader("📲 Compartilhar no WhatsApp")
+
+        # Preparar os arquivos e script de compartilhamento nativo do celular
+        import base64
+
+        js_files = []
+        for file in media_files:
+            b64_data = base64.b64encode(file.getvalue()).decode()
+            mime_type = file.type
+            file_name = file.name
+            js_files.append(
+                f"new File([Uint8Array.from(atob('{b64_data}'), c => c.charCodeAt(0))], '{file_name}', {{ type: '{mime_type}' }})"
+            )
+
+        files_array_str = f"[{', '.join(js_files)}]"
+        clean_text_wa = (
+            caption_wa.replace("\\", "\\\\").replace("`", "\\`").replace("\n", "\\n")
         )
+
+        share_html = f"""
+        <button id="shareBtn" style="
+            background-color: #25D366;
+            color: white;
+            border: none;
+            padding: 14px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            width: 100%;
+            cursor: pointer;
+            box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
+        ">📲 Toque aqui para abrir no WhatsApp com Imagens</button>
+
+        <script>
+        document.getElementById('shareBtn').addEventListener('click', async () => {{
+            try {{
+                const files = {files_array_str};
+                const text = `{clean_text_wa}`;
+                if (navigator.canShare && navigator.canShare({{ files: files }})) {{
+                    await navigator.share({{
+                        files: files,
+                        title: 'Oferta',
+                        text: text
+                    }});
+                }} else if (navigator.share) {{
+                    await navigator.share({{
+                        title: 'Oferta',
+                        text: text
+                    }});
+                }} else {{
+                    alert('O compartilhamento direto não é suportado neste navegador do celular.');
+                }}
+            }} catch (err) {{
+                console.log('Erro ao compartilhar:', err);
+            }}
+        }});
+        </script>
+        """
+
+        components.html(share_html, height=70)
+        st.info(
+            "💡 **Como usar:** Toque no botão verde acima. O celular vai abrir o menu com as imagens e o texto já anexados. Escolha o WhatsApp e selecione o seu Canal!"
+                                       )
