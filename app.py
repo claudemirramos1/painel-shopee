@@ -6,13 +6,17 @@ from PIL import Image, ImageOps, ImageEnhance
 import io
 
 # ==========================================
-# CONFIGURAÇÕES FIXAS
+# CONFIGURAÇÕES FIXAS (Insira seus dados aqui)
 # ==========================================
 FB_PAGE_ID_FIXO = "1214303865109377"
 FB_PAGE_TOKEN_FIXO = "EAAPFihJ9FJcBSWSZBdne8dP0ngvvIbl91jPCzrVi7Ub7HdOIMK6guYcr3ZAA58x2ppYVZBSuwZC9IMx1wMPpBKyAtTkSz5uqi8O4B6VCGKa943WRBVclQNizD2gbKUkckX5TIU3KonoYk7ecTwTpuZARrXd5m1ur14hxYf5qGjNYOw8L53ELcVqdCPr5jFeZCfC7w1dZAst"
 
 TELEGRAM_BOT_TOKEN_FIXO = "8353706833:AAHhyPqgeNezFY1X4NTMegpaPf_UdVOBs04"
 TELEGRAM_CHAT_ID_FIXO = "-1004406728710"
+
+# Configurações do Threads (Insira o ID e Token da sua conta do Threads/Meta)
+THREADS_USER_ID_FIXO = ""  # Ex: ID da sua conta do Threads
+THREADS_TOKEN_FIXO = ""    # Token de acesso da API do Threads
 
 # ==========================================
 # CONFIGURAÇÕES INICIAIS DA PÁGINA
@@ -23,16 +27,13 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🛍️ Painel de Automação de Ofertas com Múltiplas Fotos & Alta Resolução")
-st.markdown("Publique ofertas com várias fotos tratadas em alta nitidez (1080x1350) e links estruturados no Facebook e Telegram.")
+st.title("🛍️ Painel de Automação de Ofertas (Facebook, Telegram & Threads)")
+st.markdown("Publique ofertas com várias fotos tratadas em alta resolução (1080x1350) integradas de forma automatizada.")
 
 # ==========================================
 # FUNÇÃO DE PROCESSAMENTO DE IMAGEM
 # ==========================================
 def processar_imagem_automaticamente(imagem_upload, target_size=(1080, 1350)):
-    """
-    Padroniza para o formato vertical (1080x1350) e aplica nitidez e contraste.
-    """
     try:
         img = Image.open(imagem_upload)
         if img.mode in ("RGBA", "P"):
@@ -65,7 +66,6 @@ def postar_no_telegram(token, chat_id, texto, lista_imagens):
     if not token or not chat_id:
         return False, "Token ou Chat ID do Telegram não informados."
     try:
-        # Processa todas as imagens para o Telegram também irem em alta qualidade
         imagens_processadas = [processar_imagem_automaticamente(img) for img in lista_imagens] if lista_imagens else []
 
         if not imagens_processadas or len(imagens_processadas) == 0:
@@ -85,7 +85,7 @@ def postar_no_telegram(token, chat_id, texto, lista_imagens):
             res_data = response.json()
             return (True, "Publicado no Telegram!") if res_data.get("ok") else (False, f"Erro Telegram: {res_data.get('description')}")
         
-        else: # Múltiplas fotos no Telegram (Álbum / sendMediaGroup)
+        else:
             url = f"https://api.telegram.org/bot{token}/sendMediaGroup"
             media = []
             files = {}
@@ -119,10 +119,8 @@ def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta
         return False, "ID da Página ou Token de Acesso do FB não informados."
     try:
         legenda_limpa = texto_fb.replace("<b>", "").replace("</b>", "").replace("<code>", "").replace("</code>", "")
-        
         imagens_processadas = [processar_imagem_automaticamente(img) for img in lista_imagens] if lista_imagens else []
         
-        # Caso 1: Sem imagens (Apenas texto / link)
         if not imagens_processadas or len(imagens_processadas) == 0:
             url = f"https://graph.facebook.com/v26.0/{page_id}/feed"
             payload = {"message": legenda_limpa, "access_token": page_token}
@@ -132,7 +130,6 @@ def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta
             res_data = response.json()
             return (True, "Publicado no Facebook!") if ("id" in res_data or "post_id" in res_data) else (False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro')}")
 
-        # Caso 2: Exatamente 1 imagem
         elif len(imagens_processadas) == 1:
             img = imagens_processadas[0]
             img.seek(0)
@@ -145,7 +142,6 @@ def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta
             res_data = response.json()
             return (True, "Publicado no Facebook com foto em alta resolução!") if ("id" in res_data or "post_id" in res_data) else (False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro')}")
 
-        # Caso 3: Múltiplas imagens (Carrossel / Álbum com link e texto integrados)
         else:
             attached_media_list = []
             for img in imagens_processadas:
@@ -160,7 +156,6 @@ def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta
                 else:
                     return False, f"Erro ao enviar foto do carrossel: {data_upload.get('error', {}).get('message', 'Erro')}"
             
-            # Publica o post unificando todas as fotos, o texto formatado e o link da oferta
             url_feed = f"https://graph.facebook.com/v26.0/{page_id}/feed"
             payload_feed = {
                 "message": legenda_limpa,
@@ -176,6 +171,47 @@ def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta
 
     except Exception as e:
         return False, f"Falha no Facebook: {str(e)}"
+
+
+def postar_no_threads(user_id, token, texto_threads, lista_imagens, link_oferta=None):
+    """
+    Publica no Threads (API oficial da Meta).
+    Nota: O Threads exige criar um contêiner de mídia primeiro e depois publicá-lo.
+    """
+    if not user_id or not token:
+        return False, "User ID ou Token do Threads não configurados."
+    try:
+        legenda_limpa = texto_threads.replace("<b>", "").replace("</b>", "").replace("<code>", "").replace("</code>", "")
+        
+        # O Threads utiliza URL pública para imagens na API oficial. Como estamos usando upload local no Streamlit,
+        # enviamos o texto formatado com o link da oferta.
+        url = f"https://graph.threads.net/v1.0/{user_id}/threads"
+        payload = {
+            "media_type": "TEXT",
+            "text": legenda_limpa,
+            "access_token": token
+        }
+        
+        response = requests.post(url, data=payload, timeout=20)
+        res_data = response.json()
+        
+        if "id" in res_data:
+            container_id = res_data["id"]
+            # Publica o contêiner criado
+            url_publish = f"https://graph.threads.net/v1.0/{user_id}/threads_publish"
+            payload_publish = {
+                "creation_id": container_id,
+                "access_token": token
+            }
+            pub_response = requests.post(url_publish, data=payload_publish, timeout=20)
+            pub_data = pub_response.json()
+            
+            return (True, "Publicado no Threads com sucesso!") if "id" in pub_data else (False, f"Erro ao publicar contêiner no Threads: {pub_data.get('error', {}).get('message', 'Erro')}")
+        else:
+            return False, f"Erro Threads: {res_data.get('error', {}).get('message', 'Erro ao criar container')}"
+            
+    except Exception as e:
+        return False, f"Falha no Threads: {str(e)}"
 
 # ==========================================
 # INTERFACE PRINCIPAL
@@ -228,18 +264,20 @@ tab_redes, tab_roteiro_locucao = st.tabs(["📢 Redes Sociais", "🎙️ Roteiro
 
 with tab_redes:
     st.markdown("### 🎯 Selecione os Destinos")
-    col_check1, col_check2 = st.columns(2)
+    col_check1, col_check2, col_check3 = st.columns(3)
     with col_check1:
-        enviar_fb = st.checkbox("Facebook Page (Múltiplas Fotos & HD)", value=True)
+        enviar_fb = st.checkbox("Facebook Page (HD)", value=True)
     with col_check2:
-        enviar_tg = st.checkbox("Telegram (Álbum com Várias Fotos)", value=True)
+        enviar_tg = st.checkbox("Telegram (Álbum)", value=True)
+    with col_check3:
+        enviar_th = st.checkbox("Threads", value=False)
 
     st.markdown("---")
     if st.button("🚀 Postar Oferta em Todos os Canais", type="primary", use_container_width=True):
         if not titulo_produto and not link_afiliado:
             st.warning("Preencha ao menos o Título e o Link do produto antes de postar.")
         else:
-            st.info("Processando imagens, ajustando alta resolução e publicando...")
+            st.info("Processando imagens e publicando nos canais selecionados...")
             if enviar_fb:
                 st_fb, msg_fb = postar_no_facebook(FB_PAGE_ID_FIXO, FB_PAGE_TOKEN_FIXO, texto_gerado, imagens_upload, link_afiliado)
                 if st_fb:
@@ -253,6 +291,13 @@ with tab_redes:
                     st.success(f"✅ **Telegram:** {msg_tg}")
                 else:
                     st.error(f"❌ **Telegram:** {msg_tg}")
+
+            if enviar_th:
+                st_th, msg_th = postar_no_threads(THREADS_USER_ID_FIXO, THREADS_TOKEN_FIXO, texto_gerado, imagens_upload, link_afiliado)
+                if st_th:
+                    st.success(f"✅ **Threads:** {msg_th}")
+                else:
+                    st.error(f"❌ **Threads:** {msg_th}")
 
 with tab_roteiro_locucao:
     st.markdown("### 🎙️ Gerador de Roteiro Comercial & Áudio de Locução")
