@@ -18,7 +18,7 @@ st.markdown("Crie promoções completas e publique no Facebook, Telegram e Whats
 # ==========================================
 st.sidebar.header("⚙️ Configurações das APIs")
 
-# Telegram (Configurado com seus dados)
+# Telegram
 st.sidebar.subheader("Telegram")
 telegram_bot_token = st.sidebar.text_input(
     "Bot Token (Telegram)", 
@@ -32,7 +32,7 @@ telegram_chat_id = st.sidebar.text_input(
     key="tg_chat_id"
 )
 
-# Facebook Page (Configurado com seus dados da PromoMania)
+# Facebook Page (Atualizado com o novo token de página)
 st.sidebar.subheader("Facebook Page")
 fb_page_id = st.sidebar.text_input(
     "ID da Página FB", 
@@ -41,7 +41,7 @@ fb_page_id = st.sidebar.text_input(
 )
 fb_page_token = st.sidebar.text_input(
     "Token da Página FB", 
-    value="EAAPZAdxais7gBSUWxZCSGOBmtoW0Ni1jiVl7XV2uNY9kdm8vOs9FA0RZB7Y6a8pQGqjeTv2aFKplqMLCHw5oQwIW8HRZCRFroZC36qR3KhkMTer4TkFEeWjSZATj5mft7tZCHWcB0L6NHUkWcYfOZBDmmPPimz9KWqiZA8cyvPGOw5Y5cm15tbpU98hmjZA5MkxbCACVrOmnb9GWvjgseBxWMBgEhFsJdXahcSEHjOzWcY0p7z", 
+    value="EAAPZAdxais7gBSeZBbkkd4DwZB63yAG4n2YNSz2sg4O05GbJZBm5QszHvtaaEIsMZBFbxD5erXmrcxvGUQkmZBE278QberfbeO7ZBDPQQwNwmVVzzV3LCoKcLbZAqm7sZAY7pv6rG9hPPuJ65VTke5huNMc7Q9XqT2nZCIsfg70RcZALp4e55CZCTRZBF7YyigLUt4hUFZAQp7g4rgNkrnjv5BdV1bW8eTETk8W9ToNgjx9nCXvn8ZD", 
     type="password", 
     key="fb_page_token"
 )
@@ -63,7 +63,6 @@ def postar_no_telegram(token, chat_id, texto, lista_imagens):
         return False, "Token ou Chat ID do Telegram não informados."
     try:
         if lista_imagens and len(lista_imagens) == 1:
-            # Envio de apenas 1 Imagem
             img = lista_imagens[0]
             img.seek(0)
             url = f"https://api.telegram.org/bot{token}/sendPhoto"
@@ -74,7 +73,6 @@ def postar_no_telegram(token, chat_id, texto, lista_imagens):
             return (True, "Publicado no Telegram!") if res_data.get("ok") else (False, f"Erro Telegram: {res_data.get('description')}")
         
         elif lista_imagens and len(lista_imagens) > 1:
-            # Envio de Álbum (Múltiplas Imagens)
             url = f"https://api.telegram.org/bot{token}/sendMediaGroup"
             media = []
             files = {}
@@ -100,7 +98,6 @@ def postar_no_telegram(token, chat_id, texto, lista_imagens):
             return (True, "Álbum publicado no Telegram!") if res_data.get("ok") else (False, f"Erro Telegram: {res_data.get('description')}")
         
         else:
-            # Apenas Texto
             url = f"https://api.telegram.org/bot{token}/sendMessage"
             data = {"chat_id": chat_id, "text": texto, "parse_mode": "HTML"}
             response = requests.post(url, data=data, timeout=10)
@@ -115,7 +112,7 @@ def postar_no_facebook(page_id, page_token, texto_fb, link_oferta=None):
     if not page_id or not page_token:
         return False, "ID da Página ou Token de Acesso do FB não informados."
     try:
-        legenda_limpa = texto_fb.replace("**", "").replace("`", "")
+        legenda_limpa = texto_fb.replace("<b>", "").replace("</b>", "").replace("<code>", "").replace("</code>", "")
         url = f"https://graph.facebook.com/v26.0/{page_id}/feed"
         
         payload = {
@@ -160,14 +157,13 @@ col1, col2 = st.columns([1, 1])
 
 with col1:
     titulo_produto = st.text_input("Título do Produto", placeholder="Ex: Smart TV 55\" 4K")
-    preco_de = st.text_input("Preço De (R$)", placeholder="Ex: 2.999,00")
-    preco_por = st.text_input("Preço Por (R$)", placeholder="Ex: 1.899,00")
+    preco_de = st.text_input("Preço De (R$)", placeholder="Ex: 1000")
+    preco_por = st.text_input("Preço Por (R$)", placeholder="Ex: 800")
     cupom = st.text_input("Cupom de Desconto (Opcional)", placeholder="Ex: DESCONTO10")
 
 with col2:
     link_afiliado = st.text_input("Link da Oferta / Afiliado", placeholder="https://...")
     
-    # Habilitado para selecionar MÚLTIPLAS imagens da galeria
     imagens_upload = st.file_uploader(
         "📸 Selecionar Imagens da Galeria (Pode escolher várias)", 
         type=["jpg", "jpeg", "png", "webp"],
@@ -218,7 +214,7 @@ if st.button("🚀 Postar Oferta em Todos os Canais", type="primary", use_contai
     else:
         st.info("Enviando publicações...")
         
-        # Facebook (Publicação via Feed com Preview de Link)
+        # Facebook
         if enviar_fb:
             st_fb, msg_fb = postar_no_facebook(fb_page_id, fb_page_token, texto_gerado, link_afiliado)
             if st_fb:
@@ -226,7 +222,7 @@ if st.button("🚀 Postar Oferta em Todos os Canais", type="primary", use_contai
             else:
                 st.error(f"❌ **Facebook:** {msg_fb}")
                 
-        # Telegram (Upload de 1 imagem ou álbum com múltiplas fotos)
+        # Telegram
         if enviar_tg:
             st_tg, msg_tg = postar_no_telegram(telegram_bot_token, telegram_chat_id, texto_gerado, imagens_upload)
             if st_tg:
