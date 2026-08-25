@@ -1,13 +1,13 @@
 import json
 import requests
 import streamlit as st
-import streamlit.components.v1 as components
 
 st.set_page_config(
     page_title="Painel de Ofertas", page_icon="🛍️", layout="centered"
 )
 
 
+# Função para enviar foto/álbum para o Telegram
 def send_album_to_telegram(token, chat_id, text, media_files):
     if len(media_files) == 1:
         url = f"https://api.telegram.org/bot{token}/sendPhoto"
@@ -36,10 +36,16 @@ def send_album_to_telegram(token, chat_id, text, media_files):
     return response.json()
 
 
-st.title("🛍️ Painel de Ofertas")
-st.write(
-    "Preencha a promoção para publicar no Telegram e compartilhar no WhatsApp."
-)
+# Função para enviar foto + legenda para a Página do Facebook
+def send_to_facebook_page(page_id, page_token, text, media_file):
+    url = f"https://graph.facebook.com/v19.0/{page_id}/photos"
+    payload = {"message": text, "access_token": page_token}
+    files = {"source": media_file.getvalue()}
+    response = requests.post(url, data=payload, files=files)
+    return response.json()
+
+
+st.title("🛍️ Painel de Ofertas Automático")
 
 st.sidebar.header("🔑 Configurações do Telegram")
 telegram_token = st.sidebar.text_input(
@@ -49,6 +55,14 @@ telegram_token = st.sidebar.text_input(
 )
 telegram_chat_id = st.sidebar.text_input(
     "Telegram Chat ID", value="-1004406728710"
+)
+
+st.sidebar.header("📘 Configurações do Facebook")
+fb_page_id = st.sidebar.text_input("ID da Página do FB", value="61593393377161")
+fb_page_token = st.sidebar.text_input(
+    "Token da Página do FB",
+    value="EAAPZAdxais7gBSfB59U8h4QebaHJbtYuZA7m2H70QC3bRYcEnge4kUBIrKc30CPPow7XbYPg4jCcUgfvhf6ygqgthhfp0boakczZCMZAZAy7Rt1ZAcO7NcRSZBZBL53XolDYgZCDKpdyEMFjZB35e10liFkNcF5i4JxwbBZB2hUiHCbJAYyZC1DRi4IODG7IJIxs82cwFRZAQwYftrOQZBrKfNvkb0KhqXKvKRLrnICSqudKQGWr9sYn2IUPizgSciSkB8Y8PJROdh9CPtBuyWluAO9SkSxLgcGAZDZD",
+    type="password",
 )
 
 with st.form("offer_form"):
@@ -63,94 +77,46 @@ with st.form("offer_form"):
         accept_multiple_files=True,
     )
 
-    submit = st.form_submit_button(
-        "🚀 Enviar Telegram & Preparar para WhatsApp"
-    )
+    submit = st.form_submit_button("🚀 Postar em Todos os Canais")
 
 if submit:
     if not media_files:
         st.error("Por favor, selecione pelo menos uma imagem!")
-    elif not telegram_token:
-        st.error("Cole o seu Bot Token na barra lateral!")
     else:
         # Formatação para o Telegram
         cupom_tg = f"\n🏷️ Cupom: `{code}`" if code else ""
         caption_tg = f"🔥 *{title}*\n\n💰 Por apenas: *R$ {price}*{cupom_tg}\n\n👇 *Compre pelo link:*\n{affiliate_link}"
 
-        # Formatação para o WhatsApp
+        # Formatação para o Facebook (texto limpo)
+        cupom_fb = f"\n🏷️ Cupom: {code}" if code else ""
+        caption_fb = f"🔥 {title}\n\n💰 Por apenas: R$ {price}{cupom_fb}\n\n👇 Compre pelo link:\n{affiliate_link}"
+
+        # 1. Enviar para Telegram
+        if telegram_token and telegram_chat_id:
+            res_tg = send_album_to_telegram(
+                telegram_token, telegram_chat_id, caption_tg, media_files
+            )
+            if res_tg.get("ok"):
+                st.success("✅ Publicado no Telegram!")
+            else:
+                st.error(
+                    f"❌ Erro no Telegram: {res_tg.get('description')}"
+                )
+
+        # 2. Enviar para o Facebook
+        if fb_page_id and fb_page_token:
+            res_fb = send_to_facebook_page(
+                fb_page_id, fb_page_token, caption_fb, media_files[0]
+            )
+            if "id" in res_fb:
+                st.success("✅ Publicado na Página do Facebook!")
+            else:
+                st.error(
+                    f"❌ Erro no Facebook: {res_fb.get('error', {}).get('message')}"
+                )
+
+        st.divider()
+        st.subheader("📲 Texto Formatado (WhatsApp)")
         cupom_wa = f"\n🏷️ Cupom: *{code}*" if code else ""
         caption_wa = f"🔥 *{title}*\n\n💰 Por apenas: *R$ {price}*{cupom_wa}\n\n👇 *Compre pelo link:*\n{affiliate_link}"
-
-        # Envio automático para o Telegram
-        res = send_album_to_telegram(
-            telegram_token, telegram_chat_id, caption_tg, media_files
-        )
-
-        if res.get("ok"):
-            st.success("✅ Enviado para o Telegram com sucesso!")
-        else:
-            st.error(f"❌ Erro no Telegram: {res.get('description')}")
-
-        st.subheader("📲 Compartilhar no WhatsApp")
-
-        # Preparar os arquivos e script de compartilhamento nativo do celular
-        import base64
-
-        js_files = []
-        for file in media_files:
-            b64_data = base64.b64encode(file.getvalue()).decode()
-            mime_type = file.type
-            file_name = file.name
-            js_files.append(
-                f"new File([Uint8Array.from(atob('{b64_data}'), c => c.charCodeAt(0))], '{file_name}', {{ type: '{mime_type}' }})"
-            )
-
-        files_array_str = f"[{', '.join(js_files)}]"
-        clean_text_wa = (
-            caption_wa.replace("\\", "\\\\").replace("`", "\\`").replace("\n", "\\n")
-        )
-
-        share_html = f"""
-        <button id="shareBtn" style="
-            background-color: #25D366;
-            color: white;
-            border: none;
-            padding: 14px 20px;
-            font-size: 16px;
-            font-weight: bold;
-            border-radius: 8px;
-            width: 100%;
-            cursor: pointer;
-            box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
-        ">📲 Toque aqui para abrir no WhatsApp com Imagens</button>
-
-        <script>
-        document.getElementById('shareBtn').addEventListener('click', async () => {{
-            try {{
-                const files = {files_array_str};
-                const text = `{clean_text_wa}`;
-                if (navigator.canShare && navigator.canShare({{ files: files }})) {{
-                    await navigator.share({{
-                        files: files,
-                        title: 'Oferta',
-                        text: text
-                    }});
-                }} else if (navigator.share) {{
-                    await navigator.share({{
-                        title: 'Oferta',
-                        text: text
-                    }});
-                }} else {{
-                    alert('O compartilhamento direto não é suportado neste navegador do celular.');
-                }}
-            }} catch (err) {{
-                console.log('Erro ao compartilhar:', err);
-            }}
-        }});
-        </script>
-        """
-
-        components.html(share_html, height=70)
-        st.info(
-            "💡 **Como usar:** Toque no botão verde acima. O celular vai abrir o menu com as imagens e o texto já anexados. Escolha o WhatsApp e selecione o seu Canal!"
-                                       )
+        st.code(caption_wa, language="markdown")
