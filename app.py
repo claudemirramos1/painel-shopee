@@ -23,32 +23,26 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🛍️ Painel de Automação de Ofertas com Otimização Automática de Imagem")
-st.markdown("Publique ofertas com fotos redimensionadas em tela cheia (1080x1350) e tratadas automaticamente para máxima nitidez no Facebook e Telegram.")
+st.title("🛍️ Painel de Automação de Ofertas com Múltiplas Fotos & Alta Resolução")
+st.markdown("Publique ofertas com várias fotos tratadas em alta nitidez (1080x1350) e links estruturados no Facebook e Telegram.")
 
 # ==========================================
-# FUNÇÃO DE PROCESSAMENTO AUTOMÁTICO ROBUSTO
+# FUNÇÃO DE PROCESSAMENTO DE IMAGEM
 # ==========================================
 def processar_imagem_automaticamente(imagem_upload, target_size=(1080, 1350)):
     """
-    Processa a imagem de forma integrada:
-    1. Converte para RGB com segurança.
-    2. Ajusta para o formato vertical ideal de feed do Facebook (1080x1350) sem bordas (Crop centralizado).
-    3. Aplica camadas de nitidez e realce de contraste de alta performance para valorizar o produto.
+    Padroniza para o formato vertical (1080x1350) e aplica nitidez e contraste.
     """
     try:
         img = Image.open(imagem_upload)
         if img.mode in ("RGBA", "P"):
             img = img.convert("RGB")
             
-        # 1. Ajuste de proporção e preenchimento total de tela (Feed Vertical 4:5)
         img_ajustada = ImageOps.fit(img, target_size, method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
         
-        # 2. Realce de Nitidez Avançado (Elimina aspecto lavado/borrado)
         enhancer_sharpness = ImageEnhance.Sharpness(img_ajustada)
-        img_nitida = enhancer_sharpness.enhance(1.8) # Aumento calibrado de nitidez
+        img_nitida = enhancer_sharpness.enhance(1.8)
         
-        # 3. Realce de Contraste e Cor para destacar o produto no feed
         enhancer_contrast = ImageEnhance.Contrast(img_nitida)
         img_final = enhancer_contrast.enhance(1.15)
         
@@ -71,8 +65,18 @@ def postar_no_telegram(token, chat_id, texto, lista_imagens):
     if not token or not chat_id:
         return False, "Token ou Chat ID do Telegram não informados."
     try:
-        if lista_imagens and len(lista_imagens) == 1:
-            img = lista_imagens[0]
+        # Processa todas as imagens para o Telegram também irem em alta qualidade
+        imagens_processadas = [processar_imagem_automaticamente(img) for img in lista_imagens] if lista_imagens else []
+
+        if not imagens_processadas or len(imagens_processadas) == 0:
+            url = f"https://api.telegram.org/bot{token}/sendMessage"
+            data = {"chat_id": chat_id, "text": texto, "parse_mode": "HTML"}
+            response = requests.post(url, data=data, timeout=10)
+            res_data = response.json()
+            return (True, "Publicado no Telegram!") if res_data.get("ok") else (False, f"Erro Telegram: {res_data.get('description')}")
+        
+        elif len(imagens_processadas) == 1:
+            img = imagens_processadas[0]
             img.seek(0)
             url = f"https://api.telegram.org/bot{token}/sendPhoto"
             files = {"photo": (img.name, img.getvalue(), img.type)}
@@ -81,11 +85,11 @@ def postar_no_telegram(token, chat_id, texto, lista_imagens):
             res_data = response.json()
             return (True, "Publicado no Telegram!") if res_data.get("ok") else (False, f"Erro Telegram: {res_data.get('description')}")
         
-        elif lista_imagens and len(lista_imagens) > 1:
+        else: # Múltiplas fotos no Telegram (Álbum / sendMediaGroup)
             url = f"https://api.telegram.org/bot{token}/sendMediaGroup"
             media = []
             files = {}
-            for idx, img in enumerate(lista_imagens):
+            for idx, img in enumerate(imagens_processadas):
                 img.seek(0)
                 file_key = f"photo_{idx}"
                 files[file_key] = (img.name, img.getvalue(), img.type)
@@ -104,14 +108,7 @@ def postar_no_telegram(token, chat_id, texto, lista_imagens):
             }
             response = requests.post(url, data=data, files=files, timeout=30)
             res_data = response.json()
-            return (True, "Álbum publicado no Telegram!") if res_data.get("ok") else (False, f"Erro Telegram: {res_data.get('description')}")
-        
-        else:
-            url = f"https://api.telegram.org/bot{token}/sendMessage"
-            data = {"chat_id": chat_id, "text": texto, "parse_mode": "HTML"}
-            response = requests.post(url, data=data, timeout=10)
-            res_data = response.json()
-            return (True, "Publicado no Telegram!") if res_data.get("ok") else (False, f"Erro Telegram: {res_data.get('description')}")
+            return (True, "Álbum com múltiplas fotos publicado no Telegram!") if res_data.get("ok") else (False, f"Erro Telegram: {res_data.get('description')}")
 
     except Exception as e:
         return False, f"Falha no Telegram: {str(e)}"
@@ -123,9 +120,9 @@ def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta
     try:
         legenda_limpa = texto_fb.replace("<b>", "").replace("</b>", "").replace("<code>", "").replace("</code>", "")
         
-        # Processamento automático integrado de cada imagem enviada
         imagens_processadas = [processar_imagem_automaticamente(img) for img in lista_imagens] if lista_imagens else []
         
+        # Caso 1: Sem imagens (Apenas texto / link)
         if not imagens_processadas or len(imagens_processadas) == 0:
             url = f"https://graph.facebook.com/v26.0/{page_id}/feed"
             payload = {"message": legenda_limpa, "access_token": page_token}
@@ -135,16 +132,20 @@ def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta
             res_data = response.json()
             return (True, "Publicado no Facebook!") if ("id" in res_data or "post_id" in res_data) else (False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro')}")
 
+        # Caso 2: Exatamente 1 imagem
         elif len(imagens_processadas) == 1:
             img = imagens_processadas[0]
             img.seek(0)
             url = f"https://graph.facebook.com/v26.0/{page_id}/photos"
             files = {"source": (img.name, img.getvalue(), img.type)}
             payload = {"caption": legenda_limpa, "access_token": page_token}
+            if link_oferta and link_oferta.strip():
+                payload["link"] = link_oferta.strip()
             response = requests.post(url, data=payload, files=files, timeout=30)
             res_data = response.json()
-            return (True, "Publicado no Facebook com imagem otimizada em tela cheia!") if ("id" in res_data or "post_id" in res_data) else (False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro')}")
+            return (True, "Publicado no Facebook com foto em alta resolução!") if ("id" in res_data or "post_id" in res_data) else (False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro')}")
 
+        # Caso 3: Múltiplas imagens (Carrossel / Álbum com link e texto integrados)
         else:
             attached_media_list = []
             for img in imagens_processadas:
@@ -157,17 +158,21 @@ def postar_no_facebook(page_id, page_token, texto_fb, lista_imagens, link_oferta
                 if "id" in data_upload:
                     attached_media_list.append({"media_fbid": data_upload["id"]})
                 else:
-                    return False, f"Erro ao enviar foto para o álbum: {data_upload.get('error', {}).get('message', 'Erro')}"
+                    return False, f"Erro ao enviar foto do carrossel: {data_upload.get('error', {}).get('message', 'Erro')}"
             
+            # Publica o post unificando todas as fotos, o texto formatado e o link da oferta
             url_feed = f"https://graph.facebook.com/v26.0/{page_id}/feed"
             payload_feed = {
                 "message": legenda_limpa,
                 "attached_media": json.dumps(attached_media_list),
                 "access_token": page_token
             }
+            if link_oferta and link_oferta.strip():
+                payload_feed["link"] = link_oferta.strip()
+                
             response = requests.post(url_feed, data=payload_feed, timeout=30)
             res_data = response.json()
-            return (True, "Álbum publicado no Facebook com imagens otimizadas em tela cheia!") if ("id" in res_data or "post_id" in res_data) else (False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro')}")
+            return (True, "Publicado no Facebook com múltiplas fotos em alta resolução!") if ("id" in res_data or "post_id" in res_data) else (False, f"Erro Facebook: {res_data.get('error', {}).get('message', 'Erro')}")
 
     except Exception as e:
         return False, f"Falha no Facebook: {str(e)}"
@@ -225,16 +230,16 @@ with tab_redes:
     st.markdown("### 🎯 Selecione os Destinos")
     col_check1, col_check2 = st.columns(2)
     with col_check1:
-        enviar_fb = st.checkbox("Facebook Page (Com Tratamento Automático HD)", value=True)
+        enviar_fb = st.checkbox("Facebook Page (Múltiplas Fotos & HD)", value=True)
     with col_check2:
-        enviar_tg = st.checkbox("Telegram", value=True)
+        enviar_tg = st.checkbox("Telegram (Álbum com Várias Fotos)", value=True)
 
     st.markdown("---")
     if st.button("🚀 Postar Oferta em Todos os Canais", type="primary", use_container_width=True):
         if not titulo_produto and not link_afiliado:
             st.warning("Preencha ao menos o Título e o Link do produto antes de postar.")
         else:
-            st.info("Processando imagens automaticamente (Nitidez + Tela Cheia) e enviando...")
+            st.info("Processando imagens, ajustando alta resolução e publicando...")
             if enviar_fb:
                 st_fb, msg_fb = postar_no_facebook(FB_PAGE_ID_FIXO, FB_PAGE_TOKEN_FIXO, texto_gerado, imagens_upload, link_afiliado)
                 if st_fb:
@@ -272,4 +277,4 @@ with tab_roteiro_locucao:
                         data=f,
                         file_name="locucao_oferta.mp3",
                         mime="audio/mp3"
-                    )
+            )
