@@ -14,8 +14,8 @@ FB_PAGE_TOKEN_FIXO = "EAAPFihJ9FJcBSWSZBdne8dP0ngvvIbl91jPCzrVi7Ub7HdOIMK6guYcr3
 TELEGRAM_BOT_TOKEN_FIXO = "8353706833:AAHhyPqgeNezFY1X4NTMegpaPf_UdVOBs04"
 TELEGRAM_CHAT_ID_FIXO = "-1004406728710"
 
-# -> COLE O SEU ID DO INSTAGRAM AQUI QUANDO APARECER NO DIAGNÓSTICO ABAIXO:
-INSTAGRAM_USER_ID_FIXO = ""  
+# ID do Instagram configurado com sucesso!
+INSTAGRAM_USER_ID_FIXO = "1061621736477847"  
 
 # ==========================================
 # 2. CONFIGURAÇÕES DA PÁGINA STREAMLIT
@@ -30,21 +30,7 @@ st.title("🛍️ Painel de Automação de Ofertas (Facebook, Telegram & Instagr
 st.markdown("Publique ofertas com fotos tratadas em alta resolução (1080x1350) e automação completa.")
 
 # ==========================================
-# 3. DIAGNÓSTICO AUTOMÁTICO (PARA ACHAR O ID DO INSTAGRAM)
-# ==========================================
-with st.expander("🔍 Descobrir ID do Instagram Automaticamente (Clique Aqui)", expanded=True):
-    st.markdown("O sistema vai tentar buscar o seu ID do Instagram na API da Meta usando os dados da sua página:")
-    if st.button("Executar Busca Automática do ID"):
-        try:
-            url_diag = f"https://graph.facebook.com/v20.0/{FB_PAGE_ID_FIXO}?fields=instagram_business_account&access_token={FB_PAGE_TOKEN_FIXO}"
-            resp_diag = requests.get(url_diag, timeout=10)
-            dados_diag = resp_diag.json()
-            st.json(dados_diag)
-        except Exception as err:
-            st.error(f"Erro na requisição: {err}")
-
-# ==========================================
-# 4. FUNÇÃO DE PROCESSAMENTO DE IMAGEM
+# 3. FUNÇÃO DE PROCESSAMENTO DE IMAGEM
 # ==========================================
 def processar_imagem_automaticamente(imagem_upload, target_size=(1080, 1350)):
     try:
@@ -72,7 +58,7 @@ def processar_imagem_automaticamente(imagem_upload, target_size=(1080, 1350)):
         return imagem_upload
 
 # ==========================================
-# 5. FUNÇÕES DE POSTAGEM (REDES SOCIAIS)
+# 4. FUNÇÕES DE POSTAGEM (REDES SOCIAIS)
 # ==========================================
 
 def postar_no_telegram(token, chat_id, texto, lista_imagens):
@@ -224,7 +210,7 @@ def postar_no_instagram(ig_user_id, page_token, texto_ig, url_imagem_publica, li
         return False, f"Falha no Instagram: {str(e)}"
 
 # ==========================================
-# 6. INTERFACE VISUAL (STREAMLIT)
+# 5. INTERFACE VISUAL (STREAMLIT)
 # ==========================================
 
 st.subheader("📝 Preencher Dados da Oferta")
@@ -336,4 +322,4 @@ with tab_roteiro_locucao:
                         data=f,
                         file_name="locucao_oferta.mp3",
                         mime="audio/mp3"
-        )
+            )
