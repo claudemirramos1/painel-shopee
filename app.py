@@ -31,7 +31,6 @@ def processar_imagem_segura(
     nitidez_val=1.8,
     contraste_val=1.15,
 ):
-  """Lê os bytes da foto em um buffer em memória e aplica melhorias se ativado."""
   try:
     imagem_upload.seek(0)
     bytes_data = imagem_upload.getvalue()
@@ -263,23 +262,52 @@ def postar_no_facebook(
 
 
 # ==========================================
-# INTERFACE DA APLICAÇÃO
+# INTERFACE DA APLICAÇÃO (LAYOUT EM 2 COLUNAS)
 # ==========================================
 st.subheader("📝 Preencher Dados da Oferta")
 
-# Inicialização do Session State para os campos calculados/inseridos por botões
 if "preco_por_val" not in st.session_state:
   st.session_state.preco_por_val = ""
 if "obs_val" not in st.session_state:
   st.session_state.obs_val = ""
 
-col1, col2 = st.columns([1, 1])
+# DUAS COLUNAS PRINCIPAIS LADO A LADO
+col_esquerda, col_direita = st.columns([1, 1])
 
-with col1:
+# --- COLUNA DA ESQUERDA (PREÇOS, DESCONTOS E CUPOM) ---
+with col_esquerda:
   titulo_produto = st.text_input(
       "Título do Produto", placeholder='Ex: Smart TV 55" 4K'
   )
   preco_de = st.text_input("Preço De (R$)", placeholder="Ex: 1000")
+
+  # DESCONTOS RÁPIDOS NA ESQUERDA
+  st.caption("⚡ Desconto Rápido:")
+  cd1, cd2, cd3, cd4, cd5 = st.columns(5)
+
+
+  def aplicar_desconto(pct):
+    try:
+      val_de = float(
+          preco_de.replace(".", "").replace(",", ".").replace("R$", "").strip()
+      )
+      val_por = val_de * (1 - pct / 100)
+      st.session_state.preco_por_val = f"{val_por:.2f}".replace(".", ",")
+    except ValueError:
+      st.warning("Preencha o 'Preço De' primeiro.")
+
+
+  if cd1.button("5%"):
+    aplicar_desconto(5)
+  if cd2.button("10%"):
+    aplicar_desconto(10)
+  if cd3.button("25%"):
+    aplicar_desconto(25)
+  if cd4.button("50%"):
+    aplicar_desconto(50)
+  if cd5.button("Limpar"):
+    st.session_state.preco_por_val = ""
+
   preco_por = st.text_input(
       "Preço Por (R$)",
       value=st.session_state.preco_por_val,
@@ -287,12 +315,36 @@ with col1:
   )
   cupom = st.text_input("Cupom de Desconto (Opcional)", placeholder="Ex: DESCONTO10")
 
-with col2:
+# --- COLUNA DA DIREITA (LINK, ETIQUETAS, OBS E IMAGENS) ---
+with col_direita:
   link_afiliado = st.text_input(
       "Link da Oferta / Afiliado", placeholder="https://..."
   )
 
-  # FILE UPLOADER COM KEY FIXA
+  # ETIQUETAS RÁPIDAS NA DIREITA
+  st.caption("📌 Etiquetas Rápida:")
+  ct1, ct2, ct3 = st.columns(3)
+
+
+  def adicionar_tag(tag_texto):
+    if tag_texto not in st.session_state.obs_val:
+      if st.session_state.obs_val.strip():
+        st.session_state.obs_val += f" | {tag_texto}"
+      else:
+        st.session_state.obs_val = tag_texto
+
+
+  if ct1.button("🚚 Frete Grátis"):
+    adicionar_tag("🚚 Frete Grátis")
+  if ct2.button("⚡ Relâmpago"):
+    adicionar_tag("⚡ Oferta Relâmpago")
+  if ct3.button("⭐ Do Dia"):
+    adicionar_tag("⭐ Oferta do Dia")
+
+  descricao_extra = st.text_area(
+      "Observações (Opcional)", value=st.session_state.obs_val, height=68
+  )
+
   imagens_upload = st.file_uploader(
       "📸 Selecionar Imagens da Galeria",
       type=["jpg", "jpeg", "png", "webp"],
@@ -307,64 +359,6 @@ with col2:
       cols_img[idx % 4].image(
           img_item, caption=f"Foto {idx+1}", use_container_width=True
       )
-
-# ==========================================
-# PAINEL DE BOTÕES RÁPIDOS LADO A LADO
-# ==========================================
-col_botoes_left, col_botoes_right = st.columns(2)
-
-# --- COLUNA DA ESQUERDA: DESCONTOS RÁPIDOS ---
-with col_botoes_left:
-  st.caption("⚡ Cálculo Rápido de Desconto:")
-  c_desc1, c_desc2, c_desc3, c_desc4, c_desc5 = st.columns(5)
-
-
-  def aplicar_desconto(pct):
-    try:
-      val_de = float(
-          preco_de.replace(".", "").replace(",", ".").replace("R$", "").strip()
-      )
-      val_por = val_de * (1 - pct / 100)
-      st.session_state.preco_por_val = f"{val_por:.2f}".replace(".", ",")
-    except ValueError:
-      st.warning("Preencha o 'Preço De' primeiro.")
-
-
-  if c_desc1.button("5%"):
-    aplicar_desconto(5)
-  if c_desc2.button("10%"):
-    aplicar_desconto(10)
-  if c_desc3.button("25%"):
-    aplicar_desconto(25)
-  if c_desc4.button("50%"):
-    aplicar_desconto(50)
-  if c_desc5.button("Limpar"):
-    st.session_state.preco_por_val = ""
-
-# --- COLUNA DA DIREITA: ETIQUETAS RÁPIDAS ---
-with col_botoes_right:
-  st.caption("📌 Etiquetas Rápida nas Observações:")
-  c_tag1, c_tag2, c_tag3 = st.columns(3)
-
-
-  def adicionar_tag(tag_texto):
-    if tag_texto not in st.session_state.obs_val:
-      if st.session_state.obs_val.strip():
-        st.session_state.obs_val += f" | {tag_texto}"
-      else:
-        st.session_state.obs_val = tag_texto
-
-
-  if c_tag1.button("🚚 Frete Grátis"):
-    adicionar_tag("🚚 Frete Grátis")
-  if c_tag2.button("⚡ Relâmpago"):
-    adicionar_tag("⚡ Oferta Relâmpago")
-  if c_tag3.button("⭐ Do Dia"):
-    adicionar_tag("⭐ Oferta do Dia")
-
-descricao_extra = st.text_area(
-    "Observações (Opcional)", value=st.session_state.obs_val, height=70
-)
 
 st.markdown("---")
 
@@ -508,4 +502,4 @@ with col_btn2:
       </a>
       """,
       unsafe_allow_html=True,
-          )
+    )       
