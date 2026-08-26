@@ -106,15 +106,40 @@ with tab_cupom:
     pagar = c2.text_input("Exemplo - Pagar (R$)")
     imgs_c = st.file_uploader("📸 Banner Cupom", type=["jpg","png","webp"], accept_multiple_files=True, key="up_c")
 
+    # Cálculo automático do cupom
+    economia_str, pct_str = "", ""
+    try:
+        if carrinho and pagar:
+            v_carrinho = float(carrinho.replace(",", "."))
+            v_pagar = float(pagar.replace(",", "."))
+            economia = v_carrinho - v_pagar
+            if v_carrinho > 0:
+                pct = (economia / v_carrinho) * 100
+                economia_str = f"f.2f".replace(".", ",") if (economia := f"{economia:.2f}") else ""
+                economia_fmt = f"{v_carrinho - v_pagar:.2f}".replace(".", ",")
+                pct_fmt = f"{pct:.0f}"
+    except Exception:
+        economia_fmt, pct_fmt = "", ""
+
     ch, cw = [], []
     if titulo_c: ch.append(f"🔥 <b>{titulo_c}</b> 🔥"); cw.append(f"🔥 *{titulo_c}* 🔥")
     if regras_c: ch.append(f"⚡ {regras_c}"); cw.append(f"⚡ {regras_c}")
+    
     ex_h, ex_w = [], []
     if carrinho: ex_h.append(f"🛒 Adicione R$ {carrinho} no carrinho"); ex_w.append(f"🛒 Adicione R$ {carrinho} no carrinho")
-    if cod_c: ex_h.append(f"🎟️ {cod_c}"); ex_w.append(f"🎟️ {cod_c}")
+    if cod_c: ex_h.append(f"🎟️ Aplique o cupom: <code>{cod_c}</code>"); ex_w.append(f"🎟️ Aplique o cupom: {cod_c}")
     if pagar: ex_h.append(f"💰 <b>Pague apenas R$ {pagar}!</b>"); ex_w.append(f"💰 *Pague apenas R$ {pagar}!*")
+    
+    try:
+        if carrinho and pagar and float(carrinho.replace(",",".")) > float(pagar.replace(",",".")):
+            eco = float(carrinho.replace(",",".")) - float(pagar.replace(",","."))
+            pct = (eco / float(carrinho.replace(",","."))) * 100
+            ex_h.append(f"🤑 <b>Economia de R$ {eco:.2f}".replace(".", ",") + f" ({pct:.0f}% OFF)!</b>")
+            ex_w.append(f"🤑 *Economia de R$ {eco:.2f}".replace(".", ",") + f" ({pct:.0f}% OFF)!*")
+    except Exception: pass
+
     if ex_h: ch.append("💡 <b>Exemplo:</b>\n" + "\n".join(ex_h)); cw.append("💡 *Exemplo:*\n" + "\n".join(ex_w))
-    if link_c: ch.append(f"👉 <b>Pegue aqui:</b> {link_c}"); cw.append(f"👉 *Pegue aqui:* {link_c}")
+    if link_c: ch.append(f"👉 <b>Pegue seu cupom aqui:</b> {link_c}"); cw.append(f"👉 *Pegue seu cupom aqui:* {link_c}")
 
     txt_c_html, txt_c_wpp = "\n\n".join(ch), "\n\n".join(cw)
 
@@ -127,9 +152,9 @@ with st.expander("🎨 Ajuste de Imagem"):
     melhorar = st.checkbox("Melhorar Imagem", value=True)
     nit, cont = st.slider("Nitidez", 1.0, 3.0, 1.8), st.slider("Contraste", 1.0, 2.0, 1.15)
 
-is_cupom = bool(titulo_c or link_c)
+is_cupom = bool(titulo_c or link_c or cod_c)
 txt_html = txt_c_html if is_cupom else txt_p_html
-txt_wpp = txt_c_wpp if is_cupom else txt_p_html
+txt_wpp = txt_c_wpp if is_cupom else txt_p_wpp
 link_envio = link_c if is_cupom else link_p
 imgs_envio = imgs_c if is_cupom else imgs_p
 valid_tit = titulo_c if is_cupom else titulo_p
