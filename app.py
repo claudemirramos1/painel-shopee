@@ -231,86 +231,101 @@ with tab_cupom:
         st.markdown(f'<a href="{wpp_url_c}" target="_blank" style="text-decoration:none;"><div style="background:#25D366;color:white;padding:10px;text-align:center;border-radius:8px;font-weight:bold;">🟢 WhatsApp Cupom</div></a>', unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------
-# CAIXA DE RASCUNHO FLUTUANTE (ARRASTÁVEL, REDIMENSIONÁVEL E FECHÁVEL)
+# INJEÇÃO DIRETA NO DOCUMENTO PRINCIPAL (DOM) DO STREAMLIT
 # ---------------------------------------------------------------------
 components.html("""
-<div id="rascunho-box" style="
-    position: fixed;
-    top: 80px;
-    right: 20px;
-    width: 320px;
-    height: 250px;
-    background: #ffffff;
-    border: 2px solid #007bff;
-    border-radius: 10px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-    z-index: 999999;
-    display: flex;
-    flex-direction: column;
-    font-family: sans-serif;
-    resize: both;
-    overflow: hidden;
-    min-width: 200px;
-    min-height: 150px;
-">
-    <div id="rascunho-header" style="
-        background: #007bff;
-        color: white;
-        padding: 8px 12px;
-        cursor: move;
-        font-weight: bold;
-        font-size: 14px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        user-select: none;
-    ">
-        <span>📝 Rascunho Rápido</span>
-        <button onclick="document.getElementById('rascunho-box').style.display='none'" style="
-            background: transparent;
-            border: none;
-            color: white;
-            font-weight: bold;
-            font-size: 16px;
-            cursor: pointer;
-            line-height: 1;
-        ">✕</button>
-    </div>
-    <textarea placeholder="Cole seu rascunho aqui para copiar os trechos..." style="
-        flex: 1;
-        width: 100%;
-        padding: 10px;
-        border: none;
-        outline: none;
-        resize: none;
-        font-size: 13px;
-        box-sizing: border-box;
-        background: #f9f9f9;
-        color: #333;
-    "></textarea>
-</div>
-
 <script>
-    const box = document.getElementById("rascunho-box");
-    const header = document.getElementById("rascunho-header");
-    let isDragging = false, offsetX = 0, offsetY = 0;
+    (function() {
+        const parentDoc = window.parent.document;
+        if (parentDoc.getElementById("rascunho-box")) return;
 
-    header.addEventListener("mousedown", (e) => {
-        isDragging = true;
-        offsetX = e.clientX - box.offsetLeft;
-        offsetY = e.clientY - box.offsetTop;
-    });
+        const box = parentDoc.createElement("div");
+        box.id = "rascunho-box";
+        box.style.cssText = `
+            position: fixed;
+            top: 80px;
+            right: 25px;
+            width: 320px;
+            height: 250px;
+            background: #ffffff;
+            border: 2px solid #007bff;
+            border-radius: 10px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+            z-index: 9999999;
+            display: flex;
+            flex-direction: column;
+            font-family: sans-serif;
+            resize: both;
+            overflow: hidden;
+            min-width: 220px;
+            min-height: 150px;
+        `;
 
-    document.addEventListener("mousemove", (e) => {
-        if (isDragging) {
-            box.style.left = (e.clientX - offsetX) + "px";
-            box.style.top = (e.clientY - offsetY) + "px";
-            box.style.right = "auto";
-        }
-    });
+        box.innerHTML = `
+            <div id="rascunho-header" style="
+                background: #007bff;
+                color: white;
+                padding: 8px 12px;
+                cursor: move;
+                font-weight: bold;
+                font-size: 14px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                user-select: none;
+            ">
+                <span>📝 Rascunho Rápido</span>
+                <button id="rascunho-close" style="
+                    background: transparent;
+                    border: none;
+                    color: white;
+                    font-weight: bold;
+                    font-size: 16px;
+                    cursor: pointer;
+                    line-height: 1;
+                ">✕</button>
+            </div>
+            <textarea id="rascunho-text" placeholder="Cole seu rascunho aqui para copiar os trechos..." style="
+                flex: 1;
+                width: 100%;
+                padding: 10px;
+                border: none;
+                outline: none;
+                resize: none;
+                font-size: 13px;
+                box-sizing: border-box;
+                background: #f9f9f9;
+                color: #333;
+            "></textarea>
+        `;
 
-    document.addEventListener("mouseup", () => {
-        isDragging = false;
-    });
+        parentDoc.body.appendChild(box);
+
+        const header = parentDoc.getElementById("rascunho-header");
+        const closeBtn = parentDoc.getElementById("rascunho-close");
+        let isDragging = false, offsetX = 0, offsetY = 0;
+
+        closeBtn.addEventListener("click", () => {
+            box.style.display = "none";
+        });
+
+        header.addEventListener("mousedown", (e) => {
+            isDragging = true;
+            offsetX = e.clientX - box.offsetLeft;
+            offsetY = e.clientY - box.offsetTop;
+        });
+
+        parentDoc.addEventListener("mousemove", (e) => {
+            if (isDragging) {
+                box.style.left = (e.clientX - offsetX) + "px";
+                box.style.top = (e.clientY - offsetY) + "px";
+                box.style.right = "auto";
+            }
+        });
+
+        parentDoc.addEventListener("mouseup", () => {
+            isDragging = false;
+        });
+    })();
 </script>
 """, height=0)
