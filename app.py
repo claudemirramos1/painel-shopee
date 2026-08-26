@@ -231,34 +231,37 @@ with tab_cupom:
         st.markdown(f'<a href="{wpp_url_c}" target="_blank" style="text-decoration:none;"><div style="background:#25D366;color:white;padding:10px;text-align:center;border-radius:8px;font-weight:bold;">🟢 WhatsApp Cupom</div></a>', unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------
-# INJEÇÃO DIRETA NO DOCUMENTO PRINCIPAL (DOM) DO STREAMLIT
+# CAIXA DE RASCUNHO TOTALMENTE MANIPULÁVEL (DOM PARENT INJECTION)
 # ---------------------------------------------------------------------
 components.html("""
 <script>
     (function() {
         const parentDoc = window.parent.document;
+        
+        // Evita duplicar a caixa caso o script reexecute
         if (parentDoc.getElementById("rascunho-box")) return;
 
+        // Container Principal
         const box = parentDoc.createElement("div");
         box.id = "rascunho-box";
         box.style.cssText = `
             position: fixed;
-            top: 80px;
+            top: 70px;
             right: 25px;
-            width: 320px;
-            height: 250px;
+            width: 340px;
+            height: 260px;
             background: #ffffff;
             border: 2px solid #007bff;
-            border-radius: 10px;
-            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.25);
             z-index: 9999999;
             display: flex;
             flex-direction: column;
-            font-family: sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             resize: both;
             overflow: hidden;
-            min-width: 220px;
-            min-height: 150px;
+            min-width: 240px;
+            min-height: 160px;
         `;
 
         box.innerHTML = `
@@ -266,26 +269,46 @@ components.html("""
                 background: #007bff;
                 color: white;
                 padding: 8px 12px;
-                cursor: move;
-                font-weight: bold;
-                font-size: 14px;
+                cursor: grab;
+                font-weight: 600;
+                font-size: 13px;
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
                 user-select: none;
             ">
-                <span>📝 Rascunho Rápido</span>
-                <button id="rascunho-close" style="
-                    background: transparent;
-                    border: none;
-                    color: white;
-                    font-weight: bold;
-                    font-size: 16px;
-                    cursor: pointer;
-                    line-height: 1;
-                ">✕</button>
+                <span>📝 Rascunho Flutuante</span>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <button id="rascunho-copy" title="Copiar Tudo" style="
+                        background: rgba(255,255,255,0.2);
+                        border: none;
+                        color: white;
+                        font-size: 11px;
+                        padding: 2px 6px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                    ">📋 Copiar</button>
+                    <button id="rascunho-clear" title="Limpar Texto" style="
+                        background: rgba(255,255,255,0.2);
+                        border: none;
+                        color: white;
+                        font-size: 11px;
+                        padding: 2px 6px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                    ">🗑️ Limpar</button>
+                    <button id="rascunho-close" title="Fechar" style="
+                        background: transparent;
+                        border: none;
+                        color: white;
+                        font-weight: bold;
+                        font-size: 15px;
+                        cursor: pointer;
+                        margin-left: 4px;
+                    ">✕</button>
+                </div>
             </div>
-            <textarea id="rascunho-text" placeholder="Cole seu rascunho aqui para copiar os trechos..." style="
+            <textarea id="rascunho-text" placeholder="Cole aqui seus textos ou rascunhos para ir copiando os trechos..." style="
                 flex: 1;
                 width: 100%;
                 padding: 10px;
@@ -293,38 +316,66 @@ components.html("""
                 outline: none;
                 resize: none;
                 font-size: 13px;
+                line-height: 1.4;
                 box-sizing: border-box;
-                background: #f9f9f9;
-                color: #333;
+                background: #fdfdfd;
+                color: #222;
             "></textarea>
         `;
 
         parentDoc.body.appendChild(box);
 
         const header = parentDoc.getElementById("rascunho-header");
+        const textarea = parentDoc.getElementById("rascunho-text");
         const closeBtn = parentDoc.getElementById("rascunho-close");
+        const copyBtn = parentDoc.getElementById("rascunho-copy");
+        const clearBtn = parentDoc.getElementById("rascunho-clear");
+
         let isDragging = false, offsetX = 0, offsetY = 0;
 
-        closeBtn.addEventListener("click", () => {
-            box.style.display = "none";
-        });
-
+        // Arrastar a janela
         header.addEventListener("mousedown", (e) => {
+            if (e.target.tagName === "BUTTON") return;
             isDragging = true;
+            header.style.cursor = "grabbing";
             offsetX = e.clientX - box.offsetLeft;
             offsetY = e.clientY - box.offsetTop;
         });
 
         parentDoc.addEventListener("mousemove", (e) => {
-            if (isDragging) {
-                box.style.left = (e.clientX - offsetX) + "px";
-                box.style.top = (e.clientY - offsetY) + "px";
-                box.style.right = "auto";
-            }
+            if (!isDragging) return;
+            let left = e.clientX - offsetX;
+            let top = e.clientY - offsetY;
+
+            // Limite para a janela não fugir da tela
+            left = Math.max(0, Math.min(left, window.parent.innerWidth - box.offsetWidth));
+            top = Math.max(0, Math.min(top, window.parent.innerHeight - box.offsetHeight));
+
+            box.style.left = left + "px";
+            box.style.top = top + "px";
+            box.style.right = "auto";
         });
 
         parentDoc.addEventListener("mouseup", () => {
             isDragging = false;
+            header.style.cursor = "grab";
+        });
+
+        // Botões de Ação
+        closeBtn.addEventListener("click", () => box.style.display = "none");
+        
+        clearBtn.addEventListener("click", () => {
+            if (textarea.value.trim() && confirm("Deseja limpar todo o rascunho?")) {
+                textarea.value = "";
+            }
+        });
+
+        copyBtn.addEventListener("click", () => {
+            if (!textarea.value) return;
+            navigator.clipboard.writeText(textarea.value);
+            const originalText = copyBtn.innerText;
+            copyBtn.innerText = "✅ Copiado!";
+            setTimeout(() => copyBtn.innerText = originalText, 1500);
         });
     })();
 </script>
