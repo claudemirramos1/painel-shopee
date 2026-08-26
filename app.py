@@ -222,3 +222,87 @@ with tab_cupom:
     with cb2:
         wpp_url_c = f"https://api.whatsapp.com/send?text={urllib.parse.quote(txt_c_wpp)}"
         st.markdown(f'<a href="{wpp_url_c}" target="_blank" style="text-decoration:none;"><div style="background:#25D366;color:white;padding:10px;text-align:center;border-radius:8px;font-weight:bold;">🟢 WhatsApp Cupom</div></a>', unsafe_allow_html=True)
+import streamlit.components.v1 as components
+
+# Caixa de Rascunho Flutuante (Arrastável e Fechável)
+components.html("""
+<div id="rascunho-box" style="
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    width: 320px;
+    height: 250px;
+    background: #ffffff;
+    border: 2px solid #007bff;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    z-index: 999999;
+    display: flex;
+    flex-direction: column;
+    font-family: sans-serif;
+    resize: both;
+    overflow: hidden;
+    min-width: 200px;
+    min-height: 150px;
+">
+    <div id="rascunho-header" style="
+        background: #007bff;
+        color: white;
+        padding: 8px 12px;
+        cursor: move;
+        font-weight: bold;
+        font-size: 14px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        user-select: none;
+    ">
+        <span>📝 Rascunho Rápido</span>
+        <button onclick="document.getElementById('rascunho-box').style.display='none'" style="
+            background: transparent;
+            border: none;
+            color: white;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            line-height: 1;
+        ">✕</button>
+    </div>
+    <textarea placeholder="Cole seu rascunho aqui para copiar os trechos..." style="
+        flex: 1;
+        width: 100%;
+        padding: 10px;
+        border: none;
+        outline: none;
+        resize: none;
+        font-size: 13px;
+        box-sizing: border-box;
+        background: #f9f9f9;
+        color: #333;
+    "></textarea>
+</div>
+
+<script>
+    const box = document.getElementById("rascunho-box");
+    const header = document.getElementById("rascunho-header");
+    let isDragging = false, offsetX = 0, offsetY = 0;
+
+    header.addEventListener("mousedown", (e) => {
+        isDragging = true;
+        offsetX = e.clientX - box.offsetLeft;
+        offsetY = e.clientY - box.offsetTop;
+    });
+
+    document.addEventListener("mousemove", (e) => {
+        if (isDragging) {
+            box.style.left = (e.clientX - offsetX) + "px";
+            box.style.top = (e.clientY - offsetY) + "px";
+            box.style.right = "auto";
+        }
+    });
+
+    document.addEventListener("mouseup", () => {
+        isDragging = false;
+    });
+</script>
+""", height=0)
