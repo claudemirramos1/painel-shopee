@@ -613,12 +613,14 @@ imagens_final_envio = (
 validacao_titulo = titulo_cupom if usar_cupom else titulo_validacao
 
 with col_btn1:
-  if st.button(
+  btn_postar = st.button(
       "🚀 Postar Oferta nos Canais Selecionados",
       type="primary",
       use_container_width=True,
       key="btn_postar_geral",
-  ):
+  )
+
+  if btn_postar:
     if not enviar_telegram and not enviar_facebook:
       st.warning("Selecione ao menos um canal (Telegram ou Facebook).")
     elif not validacao_titulo and not link_final_envio:
@@ -633,4 +635,36 @@ with col_btn1:
             texto_final_html,
             imagens_final_envio,
             link_final_envio,
-       
+            aplicar_melhoria,
+            modo_redim,
+            val_nitidez,
+            val_contraste,
+        )
+        if st_fb:
+          st.success(f"✅ **Facebook:** {msg_fb}")
+        else:
+          st.error(f"❌ **Facebook:** {msg_fb}")
+
+      if enviar_telegram:
+        st_tg, msg_tg = postar_no_telegram(
+            TELEGRAM_BOT_TOKEN_FIXO,
+            TELEGRAM_CHAT_ID_FIXO,
+            texto_final_html,
+            imagens_final_envio,
+            aplicar_melhoria,
+            modo_redim,
+            val_nitidez,
+            val_contraste,
+        )
+        if st_tg:
+          st.success(f"✅ **Telegram:** {msg_tg}")
+        else:
+          st.error(f"❌ **Telegram:** {msg_tg}")
+
+with col_btn2:
+  texto_encoded = urllib.parse.quote(texto_final_wpp)
+  link_whatsapp = f"https://api.whatsapp.com/send?text={texto_encoded}"
+
+  html_wpp = f'<a href="{link_whatsapp}" target="_blank" style="text-decoration: none;"><div style="background-color: #25D366; color: white; padding: 10px; text-align: center; border-radius: 8px; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 8px;">🟢 Compartilhar no WhatsApp</div></a>'
+  st.markdown(html_wpp, unsafe_allow_html=True)io,
+                    
