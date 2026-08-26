@@ -68,7 +68,7 @@ def postar_facebook(texto, imagens, link, melhoria, modo, nitidez, contraste):
             return ("id" in res or "post_id" in res), "Sucesso!" if ("id" in res or "post_id" in res) else "Erro no envio."
         elif len(imgs) == 1:
             payload = {"caption": legenda, "access_token": FB_PAGE_TOKEN, "link": link or ""}
-            res = requests.post(f"https://graph.facebook.com/v26.0/{FB_PAGE_ID}/photos", data=payload, files={"source": (imgs[0].name, imgs[0].getvalue(), "image/jpeg")}, timeout=40).json()
+            res = requests.post(f"https://graph.facebook.com/v26.0/{FB_PAGE_ID}/photos", data={"caption": legenda, "access_token": FB_PAGE_TOKEN, "source": (imgs[0].name, imgs[0].getvalue(), "image/jpeg")}, timeout=40).json()
             return ("id" in res or "post_id" in res), "Sucesso!" if ("id" in res or "post_id" in res) else "Erro no envio."
         else:
             media_ids = []
@@ -129,7 +129,6 @@ with tab_prod:
     obs_p = c2.text_area("Observações", height=68, key="obsp")
     imgs_p = st.file_uploader("📸 Fotos do Produto", type=["jpg","png","webp"], accept_multiple_files=True, key="up_p")
 
-    # Opções independentes de envio de imagem por rede
     col_img_fb_p, col_img_tg_p = st.columns(2)
     enviar_img_fb_p = col_img_fb_p.checkbox("🖼️ Enviar imagem para o Facebook", value=True, key="chk_img_fb_p")
     enviar_img_tg_p = col_img_tg_p.checkbox("🖼️ Enviar imagem para o Telegram", value=True, key="chk_img_tg_p")
@@ -156,7 +155,6 @@ with tab_prod:
             if link_p: p_html_list.append(f"🛒 <b>Compre Aqui:</b> {link_p}")
             txt_p_html = "\n\n".join(p_html_list)
             
-            # Filtra imagem por rede
             imgs_fb = imgs_p if enviar_img_fb_p else None
             imgs_tg = imgs_p if enviar_img_tg_p else None
 
@@ -175,7 +173,6 @@ with tab_cupom:
     link_c = c1.text_input("Link do Cupom", key="lc")
     imgs_c = st.file_uploader("📸 Banner Cupom", type=["jpg","png","webp"], accept_multiple_files=True, key="up_c")
 
-    # Opções independentes de envio de imagem por rede
     col_img_fb_c, col_img_tg_c = st.columns(2)
     enviar_img_fb_c = col_img_fb_c.checkbox("🖼️ Enviar imagem para o Facebook", value=True, key="chk_img_fb_c")
     enviar_img_tg_c = col_img_tg_c.checkbox("🖼️ Enviar imagem para o Telegram", value=True, key="chk_img_tg_c")
@@ -221,7 +218,6 @@ with tab_cupom:
             if link_c: ch.append(f"👉 <b>Pegue aqui:</b> {link_c}")
             txt_c_html = "\n\n".join(ch)
 
-            # Filtra imagem por rede
             imgs_fb_c = imgs_c if enviar_img_fb_c else None
             imgs_tg_c = imgs_c if enviar_img_tg_c else None
 
@@ -231,25 +227,51 @@ with tab_cupom:
         st.markdown(f'<a href="{wpp_url_c}" target="_blank" style="text-decoration:none;"><div style="background:#25D366;color:white;padding:10px;text-align:center;border-radius:8px;font-weight:bold;">🟢 WhatsApp Cupom</div></a>', unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------
-# CAIXA DE RASCUNHO TOTALMENTE MANIPULÁVEL (DOM PARENT INJECTION)
+# CAIXA DE RASCUNHO FLUTUANTE - COM PINÇA, TOUCH E RECUPERAÇÃO
 # ---------------------------------------------------------------------
 components.html("""
 <script>
     (function() {
         const parentDoc = window.parent.document;
         
-        // Evita duplicar a caixa caso o script reexecute
         if (parentDoc.getElementById("rascunho-box")) return;
 
-        // Container Principal
+        // 1. Criar Botão Flutuante de Recuperação (Minimizado)
+        const fab = parentDoc.createElement("button");
+        fab.id = "rascunho-fab";
+        fab.title = "Abrir Rascunho";
+        fab.innerText = "📝";
+        fab.style.cssText = `
+            position: fixed;
+            bottom: 25px;
+            right: 25px;
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            background: #007bff;
+            color: white;
+            border: none;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            font-size: 22px;
+            cursor: pointer;
+            z-index: 9999998;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            touch-action: manipulation;
+        `;
+        parentDoc.body.appendChild(fab);
+
+        // 2. Criar Container Principal da Caixa
         const box = parentDoc.createElement("div");
         box.id = "rascunho-box";
         box.style.cssText = `
             position: fixed;
             top: 70px;
             right: 25px;
-            width: 340px;
-            height: 260px;
+            width: 320px;
+            height: 250px;
             background: #ffffff;
             border: 2px solid #007bff;
             border-radius: 12px;
@@ -260,8 +282,9 @@ components.html("""
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             resize: both;
             overflow: hidden;
-            min-width: 240px;
-            min-height: 160px;
+            min-width: 220px;
+            min-height: 150px;
+            touch-action: none;
         `;
 
         box.innerHTML = `
@@ -276,39 +299,40 @@ components.html("""
                 justify-content: space-between;
                 align-items: center;
                 user-select: none;
+                touch-action: none;
             ">
                 <span>📝 Rascunho Flutuante</span>
-                <div style="display: flex; gap: 8px; align-items: center;">
-                    <button id="rascunho-copy" title="Copiar Tudo" style="
+                <div style="display: flex; gap: 6px; align-items: center;">
+                    <button id="rascunho-copy" style="
                         background: rgba(255,255,255,0.2);
                         border: none;
                         color: white;
                         font-size: 11px;
-                        padding: 2px 6px;
+                        padding: 3px 6px;
                         border-radius: 4px;
                         cursor: pointer;
                     ">📋 Copiar</button>
-                    <button id="rascunho-clear" title="Limpar Texto" style="
+                    <button id="rascunho-clear" style="
                         background: rgba(255,255,255,0.2);
                         border: none;
                         color: white;
                         font-size: 11px;
-                        padding: 2px 6px;
+                        padding: 3px 6px;
                         border-radius: 4px;
                         cursor: pointer;
-                    ">🗑️ Limpar</button>
-                    <button id="rascunho-close" title="Fechar" style="
+                    ">🗑️</button>
+                    <button id="rascunho-close" style="
                         background: transparent;
                         border: none;
                         color: white;
-                        font-weight: bold;
-                        font-size: 15px;
+                        font-size: 16px;
                         cursor: pointer;
                         margin-left: 4px;
+                        font-weight: bold;
                     ">✕</button>
                 </div>
             </div>
-            <textarea id="rascunho-text" placeholder="Cole aqui seus textos ou rascunhos para ir copiando os trechos..." style="
+            <textarea id="rascunho-text" placeholder="Cole aqui seus textos ou rascunhos..." style="
                 flex: 1;
                 width: 100%;
                 padding: 10px;
@@ -320,6 +344,7 @@ components.html("""
                 box-sizing: border-box;
                 background: #fdfdfd;
                 color: #222;
+                touch-action: pan-y;
             "></textarea>
         `;
 
@@ -331,52 +356,74 @@ components.html("""
         const copyBtn = parentDoc.getElementById("rascunho-copy");
         const clearBtn = parentDoc.getElementById("rascunho-clear");
 
-        let isDragging = false, offsetX = 0, offsetY = 0;
+        let isDragging = false;
+        let offsetX = 0, offsetY = 0;
+        let initialPinchDist = null;
+        let initialSize = { w: 0, h: 0 };
 
-        // Arrastar a janela
-        header.addEventListener("mousedown", (e) => {
+        // --- ARRASTAR (Mouse e Toque) ---
+        function startDrag(e) {
             if (e.target.tagName === "BUTTON") return;
             isDragging = true;
             header.style.cursor = "grabbing";
-            offsetX = e.clientX - box.offsetLeft;
-            offsetY = e.clientY - box.offsetTop;
-        });
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            offsetX = clientX - box.offsetLeft;
+            offsetY = clientY - box.offsetTop;
+        }
 
-        parentDoc.addEventListener("mousemove", (e) => {
+        function moveDrag(e) {
             if (!isDragging) return;
-            let left = e.clientX - offsetX;
-            let top = e.clientY - offsetY;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-            // Limite para a janela não fugir da tela
+            let left = clientX - offsetX;
+            let top = clientY - offsetY;
+
             left = Math.max(0, Math.min(left, window.parent.innerWidth - box.offsetWidth));
             top = Math.max(0, Math.min(top, window.parent.innerHeight - box.offsetHeight));
 
             box.style.left = left + "px";
             box.style.top = top + "px";
             box.style.right = "auto";
-        });
+        }
 
-        parentDoc.addEventListener("mouseup", () => {
+        function stopDrag() {
             isDragging = false;
             header.style.cursor = "grab";
-        });
+        }
 
-        // Botões de Ação
-        closeBtn.addEventListener("click", () => box.style.display = "none");
-        
-        clearBtn.addEventListener("click", () => {
-            if (textarea.value.trim() && confirm("Deseja limpar todo o rascunho?")) {
-                textarea.value = "";
+        header.addEventListener("mousedown", startDrag);
+        parentDoc.addEventListener("mousemove", moveDrag);
+        parentDoc.addEventListener("mouseup", stopDrag);
+
+        header.addEventListener("touchstart", startDrag, { passive: true });
+        parentDoc.addEventListener("touchmove", moveDrag, { passive: true });
+        parentDoc.addEventListener("touchend", stopDrag);
+
+        // --- MODO PINÇA / REDIMENSIONAR COM 2 DEDOS (Pinch-to-Resize) ---
+        function getDistance(t1, t2) {
+            const dx = t1.clientX - t2.clientX;
+            const dy = t1.clientY - t2.clientY;
+            return Math.hypot(dx, dy);
+        }
+
+        box.addEventListener("touchstart", (e) => {
+            if (e.touches.length === 2) {
+                initialPinchDist = getDistance(e.touches[0], e.touches[1]);
+                initialSize = { w: box.offsetWidth, h: box.offsetHeight };
             }
-        });
+        }, { passive: true });
 
-        copyBtn.addEventListener("click", () => {
-            if (!textarea.value) return;
-            navigator.clipboard.writeText(textarea.value);
-            const originalText = copyBtn.innerText;
-            copyBtn.innerText = "✅ Copiado!";
-            setTimeout(() => copyBtn.innerText = originalText, 1500);
-        });
-    })();
-</script>
-""", height=0)
+        box.addEventListener("touchmove", (e) => {
+            if (e.touches.length === 2 && initialPinchDist) {
+                const currentDist = getDistance(e.touches[0], e.touches[1]);
+                const scale = currentDist / initialPinchDist;
+
+                const newW = Math.max(220, Math.min(initialSize.w * scale, window.parent.innerWidth - 20));
+                const newH = Math.max(150, Math.min(initialSize.h * scale, window.parent.innerHeight - 20));
+
+                box.style.width = newW + "px";
+                box.style.height = newH + "px";
+        }
+            
