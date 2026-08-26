@@ -1,7 +1,7 @@
 import io, json, urllib.parse, requests, logging, streamlit as st
 from PIL import Image, ImageEnhance, ImageOps
 
-# Desativa logs internos de rede/requisições HTTP na interface/console
+# Suprime logs internos de requisições HTTP
 logging.getLogger("urllib3").setLevel(logging.CRITICAL)
 logging.getLogger("requests").setLevel(logging.CRITICAL)
 
@@ -18,10 +18,12 @@ def processar_imagem(img_upload, melhoria=True, modo="Manter Proporção (Fundo 
     try:
         img_upload.seek(0)
         img = Image.open(io.BytesIO(img_upload.getvalue()))
-        if img.mode in ("RGBA", "P"): img = img.convert("RGB")
+        if img.mode in ("RGBA", "P"): 
+            img = img.convert("RGB")
         
         img_a = ImageOps.pad(img, (1200, 1200), color=(255, 255, 255)) if modo == "Manter Proporção (Fundo Branco)" else img.copy()
-        if modo != "Manter Proporção (Fundo Branco)": img_a.thumbnail((1200, 1200), Image.Resampling.LANCZOS)
+        if modo != "Manter Proporção (Fundo Branco)": 
+            img_a.thumbnail((1200, 1200), Image.Resampling.LANCZOS)
         
         if melhoria:
             img_a = ImageEnhance.Sharpness(img_a).enhance(nitidez)
@@ -41,16 +43,16 @@ def postar_telegram(texto, imagens, melhoria, modo, nitidez, contraste):
         imgs = [i for i in imgs if i]
         if not imgs:
             res = requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage", data={"chat_id": TG_CHAT_ID, "text": texto, "parse_mode": "HTML"}, timeout=15).json()
-            return res.get("ok"), "Enviado com sucesso!" if res.get("ok") else "Erro ao enviar."
+            return res.get("ok"), "Sucesso!" if res.get("ok") else "Erro no envio."
         elif len(imgs) == 1:
             res = requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendPhoto", data={"chat_id": TG_CHAT_ID, "caption": texto, "parse_mode": "HTML"}, files={"photo": (imgs[0].name, imgs[0].getvalue(), "image/jpeg")}, timeout=30).json()
-            return res.get("ok"), "Enviado com sucesso!" if res.get("ok") else "Erro ao enviar."
+            return res.get("ok"), "Sucesso!" if res.get("ok") else "Erro no envio."
         else:
             media = [{"type": "photo", "media": f"attach://photo_{i}", **({"caption": texto, "parse_mode": "HTML"} if i==0 else {})} for i in range(len(imgs))]
             files = {f"photo_{i}": (f"f_{i}.jpg", img.getvalue(), "image/jpeg") for i, img in enumerate(imgs)}
             res = requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMediaGroup", data={"chat_id": TG_CHAT_ID, "media": json.dumps(media)}, files=files, timeout=60).json()
-            return res.get("ok"), "Enviado com sucesso!" if res.get("ok") else "Erro ao enviar."
-    except: 
+            return res.get("ok"), "Sucesso!" if res.get("ok") else "Erro no envio."
+    except:
         return False, "Erro de conexão."
 
 def postar_facebook(texto, imagens, link, melhoria, modo, nitidez, contraste):
@@ -62,23 +64,24 @@ def postar_facebook(texto, imagens, link, melhoria, modo, nitidez, contraste):
         if not imgs:
             payload = {"message": legenda, "access_token": FB_PAGE_TOKEN, "link": link or ""}
             res = requests.post(f"https://graph.facebook.com/v26.0/{FB_PAGE_ID}/feed", data=payload, timeout=20).json()
-            return ("id" in res or "post_id" in res), "Enviado com sucesso!" if ("id" in res or "post_id" in res) else "Erro ao enviar."
+            return ("id" in res or "post_id" in res), "Sucesso!" if ("id" in res or "post_id" in res) else "Erro no envio."
         elif len(imgs) == 1:
             payload = {"caption": legenda, "access_token": FB_PAGE_TOKEN, "link": link or ""}
             res = requests.post(f"https://graph.facebook.com/v26.0/{FB_PAGE_ID}/photos", data=payload, files={"source": (imgs[0].name, imgs[0].getvalue(), "image/jpeg")}, timeout=40).json()
-            return ("id" in res or "post_id" in res), "Enviado com sucesso!" if ("id" in res or "post_id" in res) else "Erro ao enviar."
+            return ("id" in res or "post_id" in res), "Sucesso!" if ("id" in res or "post_id" in res) else "Erro no envio."
         else:
             media_ids = []
             for idx, img in enumerate(imgs):
                 r = requests.post(f"https://graph.facebook.com/v26.0/{FB_PAGE_ID}/photos", data={"published": "false", "access_token": FB_PAGE_TOKEN}, files={"source": (f"f_{idx}.jpg", img.getvalue(), "image/jpeg")}, timeout=40).json()
-                if "id" in r: media_ids.append({"media_fbid": r["id"]})
+                if "id" in r: 
+                    media_ids.append({"media_fbid": r["id"]})
             payload = {"message": legenda, "attached_media": json.dumps(media_ids), "access_token": FB_PAGE_TOKEN, "link": link or ""}
             res = requests.post(f"https://graph.facebook.com/v26.0/{FB_PAGE_ID}/feed", data=payload, timeout=60).json()
-            return ("id" in res or "post_id" in res), "Enviado com sucesso!" if ("id" in res or "post_id" in res) else "Erro ao enviar."
-    except: 
+            return ("id" in res or "post_id" in res), "Sucesso!" if ("id" in res or "post_id" in res) else "Erro no envio."
+    except:
         return False, "Erro de conexão."
 
-# Configurações Globais de Imagem e Redes
+# Configurações Globais
 with st.expander("⚙️ Configurações de Envio e Imagem", expanded=True):
     c_redes1, c_redes2 = st.columns(2)
     env_tg = c_redes1.checkbox("📢 Postar no Telegram", value=True)
@@ -98,13 +101,19 @@ def executar_envio(txt_html, txt_wpp, imgs, link, titulo):
         st.warning("Preencha ao menos o Título e o Link.")
         return
         
-    with st.spinner("Postando oferta..."):
+    with st.spinner("Enviando..."):
         if env_fb:
             ok, msg = postar_facebook(txt_html, imgs, link, melhorar, modo_r, nit, cont)
-            st.success(f"Facebook: {msg}") if ok else st.error(f"Facebook: {msg}")
+            if ok:
+                st.success(f"Facebook: {msg}")
+            else:
+                st.error(f"Facebook: {msg}")
         if env_tg:
             ok, msg = postar_telegram(txt_html, imgs, melhorar, modo_r, nit, cont)
-            st.success(f"Telegram: {msg}") if ok else st.error(f"Telegram: {msg}")
+            if ok:
+                st.success(f"Telegram: {msg}")
+            else:
+                st.error(f"Telegram: {msg}")
 
 tab_prod, tab_cupom = st.tabs(["📦 Oferta de Produto", "🎟️ Divulgação de Cupom"])
 
@@ -119,20 +128,28 @@ with tab_prod:
     obs_p = c2.text_area("Observações", height=68, key="obsp")
     imgs_p = st.file_uploader("📸 Fotos do Produto", type=["jpg","png","webp"], accept_multiple_files=True, key="up_p")
 
-    p_html, p_wpp = [], []
-    if titulo_p: p_html.append(f"🔥 <b>{titulo_p}</b>"); p_wpp.append(f"🔥 *{titulo_p}*")
-    if preco_de: p_html.append(f"❌ De: R$ {preco_de}"); p_wpp.append(f"❌ De: R$ {preco_de}")
-    if preco_por: p_html.append(f"✅ <b>Por: R$ {preco_por}</b>"); p_wpp.append(f"✅ *Por: R$ {preco_por}*")
-    if cupom_p: p_html.append(f"🎟️ Cupom: <code>{cupom_p}</code>"); p_wpp.append(f"🎟️ Cupom: {cupom_p}")
-    if obs_p: p_html.append(f"ℹ️ {obs_p}"); p_wpp.append(f"ℹ️ {obs_p}")
-    if link_p: p_html.append(f"🛒 <b>Compre Aqui:</b> {link_p}"); p_wpp.append(f"🛒 *Compre Aqui:* {link_p}")
-    
-    txt_p_html, txt_p_wpp = "\n\n".join(p_html), "\n\n".join(p_wpp)
-    
+    p_wpp_list = []
+    if titulo_p: p_wpp_list.append(f"🔥 *{titulo_p}*")
+    if preco_de: p_wpp_list.append(f"❌ De: R$ {preco_de}")
+    if preco_por: p_wpp_list.append(f"✅ *Por: R$ {preco_por}*")
+    if cupom_p: p_wpp_list.append(f"🎟️ Cupom: {cupom_p}")
+    if obs_p: p_wpp_list.append(f"ℹ️ {obs_p}")
+    if link_p: p_wpp_list.append(f"🛒 *Compre Aqui:* {link_p}")
+    txt_p_wpp = "\n\n".join(p_wpp_list)
+
     st.markdown("---")
     cb1, cb2 = st.columns([2, 1])
     with cb1:
         if st.button("🚀 Postar PRODUTO nas Redes", type="primary", use_container_width=True, key="btn_p"):
+            p_html_list = []
+            if titulo_p: p_html_list.append(f"🔥 <b>{titulo_p}</b>")
+            if preco_de: p_html_list.append(f"❌ De: R$ {preco_de}")
+            if preco_por: p_html_list.append(f"✅ <b>Por: R$ {preco_por}</b>")
+            if cupom_p: p_html_list.append(f"🎟️ Cupom: <code>{cupom_p}</code>")
+            if obs_p: p_html_list.append(f"ℹ️ {obs_p}")
+            if link_p: p_html_list.append(f"🛒 <b>Compre Aqui:</b> {link_p}")
+            txt_p_html = "\n\n".join(p_html_list)
+            
             executar_envio(txt_p_html, txt_p_wpp, imgs_p, link_p, titulo_p)
     with cb2:
         wpp_url = f"https://api.whatsapp.com/send?text={urllib.parse.quote(txt_p_wpp)}"
@@ -155,32 +172,40 @@ with tab_cupom:
             p_val = float(pct_desc.replace("%", "").replace(",", "."))
             v_val = float(val_min.replace(".", "").replace(",", "."))
             regra_auto = f"{pct_desc}% OFF em compras acima de R$ {val_min}"
-            
             res_pagar = v_val * (1 - (p_val / 100.0))
             pagar_calc = f"{res_pagar:.2f}".replace(".", ",")
-    except: pass
+    except:
+        pass
 
     c2.info(f"📋 **Regra Gerada:** {regra_auto if regra_auto else 'Preencha % e Mínimo'}")
     c2.success(f"💰 **Pague Apenas (Exemplo):** R$ {pagar_calc if pagar_calc else '0,00'}")
 
-    ch, cw = [], []
-    if titulo_c: ch.append(f"🔥 <b>{titulo_c}</b> 🔥"); cw.append(f"🔥 *{titulo_c}* 🔥")
-    if regra_auto: ch.append(f"⚡ {regra_auto}"); cw.append(f"⚡ {regra_auto}")
-    
-    ex_h, ex_w = [], []
-    if val_min: ex_h.append(f"🛒 Adicione R$ {val_min} no carrinho"); ex_w.append(f"🛒 Adicione R$ {val_min} no carrinho")
-    if cod_c: ex_h.append(f"🎟️ Cupom: <code>{cod_c}</code>"); ex_w.append(f"🎟️ Cupom: {cod_c}")
-    if pagar_calc: ex_h.append(f"💰 <b>Pague apenas R$ {pagar_calc}!</b>"); ex_w.append(f"💰 *Pague apenas R$ {pagar_calc}!*")
-    
-    if ex_h: ch.append("💡 <b>Exemplo:</b>\n" + "\n".join(ex_h)); cw.append("💡 *Exemplo:*\n" + "\n".join(ex_w))
-    if link_c: ch.append(f"👉 <b>Pegue aqui:</b> {link_c}"); cw.append(f"👉 *Pegue aqui:* {link_c}")
-
-    txt_c_html, txt_c_wpp = "\n\n".join(ch), "\n\n".join(cw)
+    cw = []
+    if titulo_c: cw.append(f"🔥 *{titulo_c}* 🔥")
+    if regra_auto: cw.append(f"⚡ {regra_auto}")
+    ex_w = []
+    if val_min: ex_w.append(f"🛒 Adicione R$ {val_min} no carrinho")
+    if cod_c: ex_w.append(f"🎟️ Cupom: {cod_c}")
+    if pagar_calc: ex_w.append(f"💰 *Pague apenas R$ {pagar_calc}!*")
+    if ex_w: cw.append("💡 *Exemplo:*\n" + "\n".join(ex_w))
+    if link_c: cw.append(f"👉 *Pegue aqui:* {link_c}")
+    txt_c_wpp = "\n\n".join(cw)
 
     st.markdown("---")
     cb1, cb2 = st.columns([2, 1])
     with cb1:
         if st.button("🚀 Postar CUPOM nas Redes", type="primary", use_container_width=True, key="btn_c"):
+            ch = []
+            if titulo_c: ch.append(f"🔥 <b>{titulo_c}</b> 🔥")
+            if regra_auto: ch.append(f"⚡ {regra_auto}")
+            ex_h = []
+            if val_min: ex_h.append(f"🛒 Adicione R$ {val_min} no carrinho")
+            if cod_c: ex_h.append(f"🎟️ Cupom: <code>{cod_c}</code>")
+            if pagar_calc: ex_h.append(f"💰 <b>Pague apenas R$ {pagar_calc}!</b>")
+            if ex_h: ch.append("💡 <b>Exemplo:</b>\n" + "\n".join(ex_h))
+            if link_c: ch.append(f"👉 <b>Pegue aqui:</b> {link_c}")
+            txt_c_html = "\n\n".join(ch)
+
             executar_envio(txt_c_html, txt_c_wpp, imgs_c, link_c, titulo_c)
     with cb2:
         wpp_url_c = f"https://api.whatsapp.com/send?text={urllib.parse.quote(txt_c_wpp)}"
