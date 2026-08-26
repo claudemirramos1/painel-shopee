@@ -29,7 +29,7 @@ def processar_imagem(img_upload, melhoria=True, modo="Manter Proporção (Fundo 
         buf.name = getattr(img_upload, "name", "foto.jpg")
         return buf
     except Exception as e:
-        st.warning(f"Erro na imagem: {e}")
+        st.warning("Erro ao processar imagem.")
         return None
 
 def postar_telegram(texto, imagens, melhoria, modo, nitidez, contraste):
@@ -38,16 +38,16 @@ def postar_telegram(texto, imagens, melhoria, modo, nitidez, contraste):
         imgs = [i for i in imgs if i]
         if not imgs:
             res = requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage", data={"chat_id": TG_CHAT_ID, "text": texto, "parse_mode": "HTML"}, timeout=15).json()
-            return res.get("ok"), res.get("description", "Sucesso")
+            return res.get("ok"), "Publicado com sucesso no Telegram!" if res.get("ok") else "Falha ao enviar."
         elif len(imgs) == 1:
             res = requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendPhoto", data={"chat_id": TG_CHAT_ID, "caption": texto, "parse_mode": "HTML"}, files={"photo": (imgs[0].name, imgs[0].getvalue(), "image/jpeg")}, timeout=30).json()
-            return res.get("ok"), res.get("description", "Sucesso")
+            return res.get("ok"), "Publicado com imagem no Telegram!" if res.get("ok") else "Falha ao enviar."
         else:
             media = [{"type": "photo", "media": f"attach://photo_{i}", **({"caption": texto, "parse_mode": "HTML"} if i==0 else {})} for i in range(len(imgs))]
             files = {f"photo_{i}": (f"f_{i}.jpg", img.getvalue(), "image/jpeg") for i, img in enumerate(imgs)}
             res = requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMediaGroup", data={"chat_id": TG_CHAT_ID, "media": json.dumps(media)}, files=files, timeout=60).json()
-            return res.get("ok"), res.get("description", "Sucesso")
-    except Exception as e: return False, str(e)
+            return res.get("ok"), f"Álbum com {len(imgs)} fotos publicado no Telegram!" if res.get("ok") else "Falha ao enviar."
+    except: return False, "Falha de conexão com Telegram."
 
 def postar_facebook(texto, imagens, link, melhoria, modo, nitidez, contraste):
     try:
@@ -58,11 +58,11 @@ def postar_facebook(texto, imagens, link, melhoria, modo, nitidez, contraste):
         if not imgs:
             payload = {"message": legenda, "access_token": FB_PAGE_TOKEN, "link": link or ""}
             res = requests.post(f"https://graph.facebook.com/v26.0/{FB_PAGE_ID}/feed", data=payload, timeout=20).json()
-            return ("id" in res or "post_id" in res), res.get("error", {}).get("message", "Sucesso")
+            return ("id" in res or "post_id" in res), "Publicado com sucesso no Facebook!" if ("id" in res or "post_id" in res) else "Falha ao enviar."
         elif len(imgs) == 1:
             payload = {"caption": legenda, "access_token": FB_PAGE_TOKEN, "link": link or ""}
             res = requests.post(f"https://graph.facebook.com/v26.0/{FB_PAGE_ID}/photos", data=payload, files={"source": (imgs[0].name, imgs[0].getvalue(), "image/jpeg")}, timeout=40).json()
-            return ("id" in res or "post_id" in res), res.get("error", {}).get("message", "Sucesso")
+            return ("id" in res or "post_id" in res), "Publicado com imagem no Facebook!" if ("id" in res or "post_id" in res) else "Falha ao enviar."
         else:
             media_ids = []
             for idx, img in enumerate(imgs):
@@ -70,8 +70,8 @@ def postar_facebook(texto, imagens, link, melhoria, modo, nitidez, contraste):
                 if "id" in r: media_ids.append({"media_fbid": r["id"]})
             payload = {"message": legenda, "attached_media": json.dumps(media_ids), "access_token": FB_PAGE_TOKEN, "link": link or ""}
             res = requests.post(f"https://graph.facebook.com/v26.0/{FB_PAGE_ID}/feed", data=payload, timeout=60).json()
-            return ("id" in res or "post_id" in res), res.get("error", {}).get("message", "Sucesso")
-    except Exception as e: return False, str(e)
+            return ("id" in res or "post_id" in res), f"Carrossel com {len(media_ids)} fotos publicado no Facebook!" if ("id" in res or "post_id" in res) else "Falha ao enviar."
+    except: return False, "Falha de conexão com Facebook."
 
 # Configurações Globais de Imagem e Redes
 with st.expander("⚙️ Configurações de Envio e Imagem", expanded=True):
@@ -93,12 +93,13 @@ def executar_envio(txt_html, txt_wpp, imgs, link, titulo):
         st.warning("Preencha ao menos o Título e o Link.")
         return
         
-    if env_fb:
-        ok, msg = postar_facebook(txt_html, imgs, link, melhorar, modo_r, nit, cont)
-        st.success(f"FB: {msg}") if ok else st.error(f"FB: {msg}")
-    if env_tg:
-        ok, msg = postar_telegram(txt_html, imgs, melhorar, modo_r, nit, cont)
-        st.success(f"TG: {msg}") if ok else st.error(f"TG: {msg}")
+    with st.spinner("Enviando a oferta..."):
+        if env_fb:
+            ok, msg = postar_facebook(txt_html, imgs, link, melhorar, modo_r, nit, cont)
+            st.success(f"Facebook: {msg}") if ok else st.error(f"Facebook: {msg}")
+        if env_tg:
+            ok, msg = postar_telegram(txt_html, imgs, melhorar, modo_r, nit, cont)
+            st.success(f"Telegram: {msg}") if ok else st.error(f"Telegram: {msg}")
 
 tab_prod, tab_cupom = st.tabs(["📦 Oferta de Produto", "🎟️ Divulgação de Cupom"])
 
@@ -142,7 +143,6 @@ with tab_cupom:
     link_c = c1.text_input("Link do Cupom", key="lc")
     imgs_c = st.file_uploader("📸 Banner Cupom", type=["jpg","png","webp"], accept_multiple_files=True, key="up_c")
 
-    # Cálculo Automático da Regra e Valor Final
     regra_auto = ""
     pagar_calc = ""
     try:
