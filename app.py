@@ -229,7 +229,7 @@ with tab_cupom:
 # ---------------------------------------------------------------------
 # CAIXA DE RASCUNHO FLUTUANTE - COM PINÇA, TOUCH E RECUPERAÇÃO
 # ---------------------------------------------------------------------
-components.html('''
+components.html(r'''
 <script>
     (function() {
         const parentDoc = window.parent.document;
@@ -428,4 +428,4 @@ components.html('''
             }
         }, { passive: true });
 
-    
+   
