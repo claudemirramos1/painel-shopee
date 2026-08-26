@@ -68,7 +68,7 @@ def postar_facebook(texto, imagens, link, melhoria, modo, nitidez, contraste):
             return ("id" in res or "post_id" in res), "Sucesso!" if ("id" in res or "post_id" in res) else "Erro no envio."
         elif len(imgs) == 1:
             payload = {"caption": legenda, "access_token": FB_PAGE_TOKEN, "link": link or ""}
-            res = requests.post(f"https://graph.facebook.com/v26.0/{FB_PAGE_ID}/photos", data={"caption": legenda, "access_token": FB_PAGE_TOKEN, "source": (imgs[0].name, imgs[0].getvalue(), "image/jpeg")}, timeout=40).json()
+            res = requests.post(f"https://graph.facebook.com/v26.0/{FB_PAGE_ID}/photos", data=payload, files={"source": (imgs[0].name, imgs[0].getvalue(), "image/jpeg")}, timeout=40).json()
             return ("id" in res or "post_id" in res), "Sucesso!" if ("id" in res or "post_id" in res) else "Erro no envio."
         else:
             media_ids = []
@@ -229,7 +229,7 @@ with tab_cupom:
 # ---------------------------------------------------------------------
 # CAIXA DE RASCUNHO FLUTUANTE - COM PINÇA, TOUCH E RECUPERAÇÃO
 # ---------------------------------------------------------------------
-components.html("""
+components.html('''
 <script>
     (function() {
         const parentDoc = window.parent.document;
@@ -425,5 +425,7 @@ components.html("""
 
                 box.style.width = newW + "px";
                 box.style.height = newH + "px";
-        }
-            
+            }
+        }, { passive: true });
+
+    
