@@ -279,7 +279,6 @@ with tab_produto:
   if "obs_val" not in st.session_state:
     st.session_state.obs_val = ""
 
-  # --- LINHA 1: TÍTULO E LINK ---
   col1_left, col1_right = st.columns(2)
   with col1_left:
     titulo_produto = st.text_input(
@@ -290,7 +289,6 @@ with tab_produto:
         "Link da Oferta / Afiliado", placeholder="https://..."
     )
 
-  # --- LINHA 2: PREÇO DE E PREÇO POR ---
   col2_left, col2_right = st.columns(2)
   with col2_left:
     preco_de = st.text_input("Preço De (R$)", placeholder="Ex: 1000")
@@ -301,10 +299,8 @@ with tab_produto:
         placeholder="Ex: 800",
     )
 
-  # --- LINHA 3: PAINEL DE BOTÕES RÁPIDOS LADO A LADO ---
   col3_left, col3_right = st.columns(2)
 
-  # Esquerda: Descontos
   with col3_left:
     st.caption("⚡ Cálculo Rápido de Desconto:")
     cd1, cd2, cd3, cd4, cd5 = st.columns(5)
@@ -333,7 +329,6 @@ with tab_produto:
     if cd5.button("Limpar", key="btn_limpar_desc"):
       st.session_state.preco_por_val = ""
 
-  # Direita: Etiquetas
   with col3_right:
     st.caption("📌 Etiquetas Rápida:")
     ct1, ct2, ct3 = st.columns(3)
@@ -352,7 +347,6 @@ with tab_produto:
     if ct3.button("⭐ Do Dia", key="btn_dodia"):
       adicionar_tag("⭐ Oferta do Dia")
 
-  # --- LINHA 4: CUPOM E OBSERVAÇÕES ---
   col4_left, col4_right = st.columns(2)
   with col4_left:
     cupom = st.text_input(
@@ -363,7 +357,6 @@ with tab_produto:
         "Observações (Opcional)", value=st.session_state.obs_val, height=68
     )
 
-  # --- LINHA 5: UPLOAD DE FOTOS ---
   imagens_upload = st.file_uploader(
       "📸 Selecionar Imagens da Galeria",
       type=["jpg", "jpeg", "png", "webp"],
@@ -379,7 +372,6 @@ with tab_produto:
           img_item, caption=f"Foto {idx+1}", use_container_width=True
       )
 
-  # Montagem do texto do produto
   texto_gerado_html = (
       f"🔥 <b>{titulo_produto if titulo_produto else 'OFERTA IMPERDÍVEL'}</b>\n\n"
   )
@@ -451,7 +443,6 @@ with tab_cupom:
       key="uploader_fotos_cupom",
   )
 
-  # Montagem do texto do cupom
   texto_cupom_html = f"🔥 <b>{titulo_cupom if titulo_cupom else 'CUPOM EXCLUSIVO!'}</b> 🔥\n\n"
   if regras_cupom:
     texto_cupom_html += f"⚡ {regras_cupom}\n\n"
@@ -472,7 +463,6 @@ with tab_cupom:
         f"👉 <b>Pegue o cupom e aproveite aqui:</b> {link_cupom}"
     )
 
-  # Texto limpo para WhatsApp
   texto_cupom_wpp = f"🔥 *{titulo_cupom if titulo_cupom else 'CUPOM EXCLUSIVO!'}* 🔥\n\n"
   if regras_cupom:
     texto_cupom_wpp += f"⚡ {regras_cupom}\n\n"
@@ -545,7 +535,6 @@ st.markdown("---")
 
 col_btn1, col_btn2 = st.columns([2, 1])
 
-# Seleção automática de qual conteúdo enviar
 usar_cupom = bool(titulo_cupom or link_cupom)
 
 texto_final_html = texto_cupom_html if usar_cupom else texto_gerado_html
@@ -605,8 +594,5 @@ with col_btn2:
   texto_encoded = urllib.parse.quote(texto_final_wpp)
   link_whatsapp = f"https://api.whatsapp.com/send?text={texto_encoded}"
 
-  html_wpp = f"""
-    <a href="{link_whatsapp}" target="_blank" style="text-decoration: none;">
-        <div style="background-color: #25D366; color: white; padding: 10px; text-align: center; border-radius: 8px; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 8px;">
-            🟢 Compartilhar no WhatsApp
-        
+  html_wpp = f'<a href="{link_whatsapp}" target="_blank" style="text-decoration: none;"><div style="background-color: #25D366; color: white; padding: 10px; text-align: center; border-radius: 8px; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 8px;">🟢 Compartilhar no WhatsApp</div></a>'
+  st.markdown(html_wpp, unsafe_allow_html=True)
