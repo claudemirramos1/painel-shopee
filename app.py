@@ -545,8 +545,7 @@ st.markdown("---")
 
 col_btn1, col_btn2 = st.columns([2, 1])
 
-# Seleção automática de qual conteúdo enviar com base na aba ativa na tela
-# Nota: O Streamlit renderiza os dois, então verificamos qual conteúdo foi preenchido
+# Seleção automática de qual conteúdo enviar
 usar_cupom = bool(titulo_cupom or link_cupom)
 
 texto_final_html = texto_cupom_html if usar_cupom else texto_gerado_html
@@ -605,10 +604,10 @@ with col_btn1:
 with col_btn2:
   texto_encoded = urllib.parse.quote(texto_final_wpp)
   link_whatsapp = f"https://api.whatsapp.com/send?text={texto_encoded}"
-  st.markdown(
-      f"""
-      <a href="{link_whatsapp}" target="_blank" style="text-decoration: none;">
-          <div style="
-              background-color: #25D366;
-              color: white;
-          
+
+  html_wpp = (
+      f'<a href="{link_whatsapp}" target="_blank" style="text-decoration:'
+      ' none;"><div style="background-color: #25D366; color: white; padding:'
+      " 10px; text-align: center; border-radius: 8px; font-weight: bold;"
+      ' display: flex; align-items: center; justify-content: center; gap:'
+     
