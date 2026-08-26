@@ -28,8 +28,7 @@ def processar_imagem(img_upload, melhoria=True, modo="Manter Proporção (Fundo 
         buf.seek(0)
         buf.name = getattr(img_upload, "name", "foto.jpg")
         return buf
-    except Exception as e:
-        st.warning(f"Erro na imagem: {e}")
+    except Exception:
         return None
 
 def postar_telegram(texto, imagens, melhoria, modo, nitidez, contraste):
@@ -38,16 +37,17 @@ def postar_telegram(texto, imagens, melhoria, modo, nitidez, contraste):
         imgs = [i for i in imgs if i]
         if not imgs:
             res = requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage", data={"chat_id": TG_CHAT_ID, "text": texto, "parse_mode": "HTML"}, timeout=15).json()
-            return res.get("ok"), res.get("description", "Sucesso")
+            return res.get("ok", False)
         elif len(imgs) == 1:
             res = requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendPhoto", data={"chat_id": TG_CHAT_ID, "caption": texto, "parse_mode": "HTML"}, files={"photo": (imgs[0].name, imgs[0].getvalue(), "image/jpeg")}, timeout=30).json()
-            return res.get("ok"), res.get("description", "Sucesso")
+            return res.get("ok", False)
         else:
             media = [{"type": "photo", "media": f"attach://photo_{i}", **({"caption": texto, "parse_mode": "HTML"} if i==0 else {})} for i in range(len(imgs))]
             files = {f"photo_{i}": (f"f_{i}.jpg", img.getvalue(), "image/jpeg") for i, img in enumerate(imgs)}
             res = requests.post(f"https://api.telegram.org/bot{TG_TOKEN}/sendMediaGroup", data={"chat_id": TG_CHAT_ID, "media": json.dumps(media)}, files=files, timeout=60).json()
-            return res.get("ok"), res.get("description", "Sucesso")
-    except Exception as e: return False, str(e)
+            return res.get("ok", False)
+    except Exception:
+        return False
 
 def postar_facebook(texto, imagens, link, melhoria, modo, nitidez, contraste):
     try:
@@ -58,11 +58,11 @@ def postar_facebook(texto, imagens, link, melhoria, modo, nitidez, contraste):
         if not imgs:
             payload = {"message": legenda, "access_token": FB_PAGE_TOKEN, "link": link or ""}
             res = requests.post(f"https://graph.facebook.com/v26.0/{FB_PAGE_ID}/feed", data=payload, timeout=20).json()
-            return ("id" in res or "post_id" in res), res.get("error", {}).get("message", "Sucesso")
+            return ("id" in res or "post_id" in res)
         elif len(imgs) == 1:
             payload = {"caption": legenda, "access_token": FB_PAGE_TOKEN, "link": link or ""}
             res = requests.post(f"https://graph.facebook.com/v26.0/{FB_PAGE_ID}/photos", data=payload, files={"source": (imgs[0].name, imgs[0].getvalue(), "image/jpeg")}, timeout=40).json()
-            return ("id" in res or "post_id" in res), res.get("error", {}).get("message", "Sucesso")
+            return ("id" in res or "post_id" in res)
         else:
             media_ids = []
             for idx, img in enumerate(imgs):
@@ -70,47 +70,20 @@ def postar_facebook(texto, imagens, link, melhoria, modo, nitidez, contraste):
                 if "id" in r: media_ids.append({"media_fbid": r["id"]})
             payload = {"message": legenda, "attached_media": json.dumps(media_ids), "access_token": FB_PAGE_TOKEN, "link": link or ""}
             res = requests.post(f"https://graph.facebook.com/v26.0/{FB_PAGE_ID}/feed", data=payload, timeout=60).json()
-            return ("id" in res or "post_id" in res), res.get("error", {}).get("message", "Sucesso")
-    except Exception as e: return False, str(e)
-
-# Configurações Globais de Imagem e Redes
-with st.expander("⚙️ Configurações de Envio e Imagem", expanded=True):
-    c_redes1, c_redes2 = st.columns(2)
-    env_tg = c_redes1.checkbox("📢 Postar no Telegram", value=True)
-    env_fb = c_redes2.checkbox("📘 Postar no Facebook", value=True)
-    
-    c_img1, c_img2, c_img3 = st.columns(3)
-    modo_r = c_img1.radio("Modo Imagem:", ["Manter Proporção (Fundo Branco)", "Apenas Reduzir"])
-    melhorar = c_img2.checkbox("Melhorar Imagem", value=True)
-    nit = c_img3.slider("Nitidez", 1.0, 3.0, 1.8)
-    cont = c_img3.slider("Contraste", 1.0, 2.0, 1.15)
-
-def executar_envio(txt_html, txt_wpp, imgs, link, titulo):
-    if not (env_tg or env_fb): 
-        st.warning("Selecione ao menos um canal de envio.")
-        return
-    if not titulo and not link: 
-        st.warning("Preencha ao menos o Título e o Link.")
-        return
-        
-    if env_fb:
-        ok, msg = postar_facebook(txt_html, imgs, link, melhorar, modo_r, nit, cont)
-        st.success(f"FB: {msg}") if ok else st.error(f"FB: {msg}")
-    if env_tg:
-        ok, msg = postar_telegram(txt_html, imgs, melhorar, modo_r, nit, cont)
-        st.success(f"TG: {msg}") if ok else st.error(f"TG: {msg}")
+            return ("id" in res or "post_id" in res)
+    except Exception:
+        return False
 
 tab_prod, tab_cupom = st.tabs(["📦 Oferta de Produto", "🎟️ Divulgação de Cupom"])
 
-# ABA 1: PRODUTO
 with tab_prod:
     c1, c2 = st.columns(2)
-    titulo_p = c1.text_input("Título do Produto", key="tp")
-    link_p = c2.text_input("Link da Oferta", key="lp")
-    preco_de = c1.text_input("Preço De (R$)", key="pde")
-    preco_por = c2.text_input("Preço Por (R$)", key="ppor")
-    cupom_p = c1.text_input("Cupom (Opcional)", key="cp")
-    obs_p = c2.text_area("Observações", height=68, key="obsp")
+    titulo_p = c1.text_input("Título do Produto")
+    link_p = c2.text_input("Link da Oferta")
+    preco_de = c1.text_input("Preço De (R$)")
+    preco_por = c2.text_input("Preço Por (R$)")
+    cupom_p = c1.text_input("Cupom (Opcional)")
+    obs_p = c2.text_area("Observações", height=68)
     imgs_p = st.file_uploader("📸 Fotos do Produto", type=["jpg","png","webp"], accept_multiple_files=True, key="up_p")
 
     p_html, p_wpp = [], []
@@ -122,61 +95,59 @@ with tab_prod:
     if link_p: p_html.append(f"🛒 <b>Compre Aqui:</b> {link_p}"); p_wpp.append(f"🛒 *Compre Aqui:* {link_p}")
     
     txt_p_html, txt_p_wpp = "\n\n".join(p_html), "\n\n".join(p_wpp)
-    
-    st.markdown("---")
-    cb1, cb2 = st.columns([2, 1])
-    with cb1:
-        if st.button("🚀 Postar PRODUTO nas Redes", type="primary", use_container_width=True, key="btn_p"):
-            executar_envio(txt_p_html, txt_p_wpp, imgs_p, link_p, titulo_p)
-    with cb2:
-        wpp_url = f"https://api.whatsapp.com/send?text={urllib.parse.quote(txt_p_wpp)}"
-        st.markdown(f'<a href="{wpp_url}" target="_blank" style="text-decoration:none;"><div style="background:#25D366;color:white;padding:10px;text-align:center;border-radius:8px;font-weight:bold;">🟢 WhatsApp Produto</div></a>', unsafe_allow_html=True)
 
-# ABA 2: CUPOM
 with tab_cupom:
     c1, c2 = st.columns(2)
-    titulo_c = c1.text_input("Título / Loja", key="tc")
-    pct_desc = c1.text_input("Desconto (%)", placeholder="Ex: 15", key="pctc")
-    val_min = c1.text_input("Valor Mínimo Compras (R$)", placeholder="Ex: 130", key="minc")
-    cod_c = c1.text_input("Código do Cupom", key="cc")
-    link_c = c1.text_input("Link do Cupom", key="lc")
+    titulo_c = c1.text_input("Título / Loja")
+    regras_c = c1.text_input("Regra do Desconto")
+    cod_c = c1.text_input("Código do Cupom")
+    link_c = c1.text_input("Link do Cupom")
+    carrinho = c2.text_input("Exemplo - Carrinho (R$)")
+    pagar = c2.text_input("Exemplo - Pagar (R$)")
     imgs_c = st.file_uploader("📸 Banner Cupom", type=["jpg","png","webp"], accept_multiple_files=True, key="up_c")
-
-    # Cálculo Automático da Regra e Valor Final
-    regra_auto = ""
-    pagar_calc = ""
-    try:
-        if pct_desc and val_min:
-            p_val = float(pct_desc.replace("%", "").replace(",", "."))
-            v_val = float(val_min.replace(".", "").replace(",", "."))
-            regra_auto = f"{pct_desc}% OFF em compras acima de R$ {val_min}"
-            
-            res_pagar = v_val * (1 - (p_val / 100.0))
-            pagar_calc = f"{res_pagar:.2f}".replace(".", ",")
-    except: pass
-
-    c2.info(f"📋 **Regra Gerada:** {regra_auto if regra_auto else 'Preencha % e Mínimo'}")
-    c2.success(f"💰 **Pague Apenas (Exemplo):** R$ {pagar_calc if pagar_calc else '0,00'}")
 
     ch, cw = [], []
     if titulo_c: ch.append(f"🔥 <b>{titulo_c}</b> 🔥"); cw.append(f"🔥 *{titulo_c}* 🔥")
-    if regra_auto: ch.append(f"⚡ {regra_auto}"); cw.append(f"⚡ {regra_auto}")
-    
+    if regras_c: ch.append(f"⚡ {regras_c}"); cw.append(f"⚡ {regras_c}")
     ex_h, ex_w = [], []
-    if val_min: ex_h.append(f"🛒 Adicione R$ {val_min} no carrinho"); ex_w.append(f"🛒 Adicione R$ {val_min} no carrinho")
-    if cod_c: ex_h.append(f"🎟️ Cupom: <code>{cod_c}</code>"); ex_w.append(f"🎟️ Cupom: {cod_c}")
-    if pagar_calc: ex_h.append(f"💰 <b>Pague apenas R$ {pagar_calc}!</b>"); ex_w.append(f"💰 *Pague apenas R$ {pagar_calc}!*")
-    
+    if carrinho: ex_h.append(f"🛒 Adicione R$ {carrinho} no carrinho"); ex_w.append(f"🛒 Adicione R$ {carrinho} no carrinho")
+    if cod_c: ex_h.append(f"🎟️ {cod_c}"); ex_w.append(f"🎟️ {cod_c}")
+    if pagar: ex_h.append(f"💰 <b>Pague apenas R$ {pagar}!</b>"); ex_w.append(f"💰 *Pague apenas R$ {pagar}!*")
     if ex_h: ch.append("💡 <b>Exemplo:</b>\n" + "\n".join(ex_h)); cw.append("💡 *Exemplo:*\n" + "\n".join(ex_w))
     if link_c: ch.append(f"👉 <b>Pegue aqui:</b> {link_c}"); cw.append(f"👉 *Pegue aqui:* {link_c}")
 
     txt_c_html, txt_c_wpp = "\n\n".join(ch), "\n\n".join(cw)
 
-    st.markdown("---")
-    cb1, cb2 = st.columns([2, 1])
-    with cb1:
-        if st.button("🚀 Postar CUPOM nas Redes", type="primary", use_container_width=True, key="btn_c"):
-            executar_envio(txt_c_html, txt_c_wpp, imgs_c, link_c, titulo_c)
-    with cb2:
-        wpp_url_c = f"https://api.whatsapp.com/send?text={urllib.parse.quote(txt_c_wpp)}"
-        st.markdown(f'<a href="{wpp_url_c}" target="_blank" style="text-decoration:none;"><div style="background:#25D366;color:white;padding:10px;text-align:center;border-radius:8px;font-weight:bold;">🟢 WhatsApp Cupom</div></a>', unsafe_allow_html=True)
+st.markdown("---")
+env_tg = st.checkbox("📢 Postar no Telegram", value=True)
+env_fb = st.checkbox("📘 Postar no Facebook", value=True)
+
+with st.expander("🎨 Ajuste de Imagem"):
+    modo_r = st.radio("Modo:", ["Manter Proporção (Fundo Branco)", "Apenas Reduzir"])
+    melhorar = st.checkbox("Melhorar Imagem", value=True)
+    nit, cont = st.slider("Nitidez", 1.0, 3.0, 1.8), st.slider("Contraste", 1.0, 2.0, 1.15)
+
+is_cupom = bool(titulo_c or link_c)
+txt_html = txt_c_html if is_cupom else txt_p_html
+txt_wpp = txt_c_wpp if is_cupom else txt_p_html
+link_envio = link_c if is_cupom else link_p
+imgs_envio = imgs_c if is_cupom else imgs_p
+valid_tit = titulo_c if is_cupom else titulo_p
+
+col_b1, col_b2 = st.columns([2, 1])
+with col_b1:
+    if st.button("🚀 Postar Oferta", type="primary", use_container_width=True):
+        if not (env_tg or env_fb): 
+            st.warning("Selecione pelo menos um canal.")
+        elif not valid_tit and not link_envio: 
+            st.warning("Preencha o Título e o Link.")
+        else:
+            if env_fb:
+                postar_facebook(txt_html, imgs_envio, link_envio, melhorar, modo_r, nit, cont)
+            if env_tg:
+                postar_telegram(txt_html, imgs_envio, melhorar, modo_r, nit, cont)
+            st.success("Oferta enviada com sucesso!")
+
+with col_b2:
+    wpp_url = f"https://api.whatsapp.com/send?text={urllib.parse.quote(txt_wpp)}"
+    st.markdown(f'<a href="{wpp_url}" target="_blank" style="text-decoration:none;"><div style="background:#25D366;color:white;padding:10px;text-align:center;border-radius:8px;font-weight:bold;">🟢 Compartilhar WhatsApp</div></a>', unsafe_allow_html=True)
