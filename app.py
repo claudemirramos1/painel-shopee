@@ -262,132 +262,262 @@ def postar_no_facebook(
 
 
 # ==========================================
-# INTERFACE DA APLICAÇÃO (FORMULÁRIO ALINHADO)
+# DIVISÃO POR ABAS (PRODUTO E CUPOM)
 # ==========================================
-st.subheader("📝 Preencher Dados da Oferta")
-
-if "preco_por_val" not in st.session_state:
-  st.session_state.preco_por_val = ""
-if "obs_val" not in st.session_state:
-  st.session_state.obs_val = ""
-
-# --- LINHA 1: TÍTULO E LINK ---
-col1_left, col1_right = st.columns(2)
-with col1_left:
-  titulo_produto = st.text_input(
-      "Título do Produto", placeholder='Ex: Smart TV 55" 4K'
-  )
-with col1_right:
-  link_afiliado = st.text_input(
-      "Link da Oferta / Afiliado", placeholder="https://..."
-  )
-
-# --- LINHA 2: PREÇO DE E PREÇO POR ---
-col2_left, col2_right = st.columns(2)
-with col2_left:
-  preco_de = st.text_input("Preço De (R$)", placeholder="Ex: 1000")
-with col2_right:
-  preco_por = st.text_input(
-      "Preço Por (R$)",
-      value=st.session_state.preco_por_val,
-      placeholder="Ex: 800",
-  )
-
-# --- LINHA 3: PAINEL DE BOTÕES RÁPIDOS LADO A LADO ---
-col3_left, col3_right = st.columns(2)
-
-# Esquerda: Descontos
-with col3_left:
-  st.caption("⚡ Cálculo Rápido de Desconto:")
-  cd1, cd2, cd3, cd4, cd5 = st.columns(5)
-
-
-  def aplicar_desconto(pct):
-    try:
-      val_de = float(
-          preco_de.replace(".", "").replace(",", ".").replace("R$", "").strip()
-      )
-      val_por = val_de * (1 - pct / 100)
-      st.session_state.preco_por_val = f"{val_por:.2f}".replace(".", ",")
-    except ValueError:
-      st.warning("Preencha o 'Preço De' primeiro.")
-
-
-  if cd1.button("5%"):
-    aplicar_desconto(5)
-  if cd2.button("10%"):
-    aplicar_desconto(10)
-  if cd3.button("25%"):
-    aplicar_desconto(25)
-  if cd4.button("50%"):
-    aplicar_desconto(50)
-  if cd5.button("Limpar"):
-    st.session_state.preco_por_val = ""
-
-# Direita: Etiquetas
-with col3_right:
-  st.caption("📌 Etiquetas Rápida:")
-  ct1, ct2, ct3 = st.columns(3)
-
-
-  def adicionar_tag(tag_texto):
-    if tag_texto not in st.session_state.obs_val:
-      if st.session_state.obs_val.strip():
-        st.session_state.obs_val += f" | {tag_texto}"
-      else:
-        st.session_state.obs_val = tag_texto
-
-
-  if ct1.button("🚚 Frete Grátis"):
-    adicionar_tag("🚚 Frete Grátis")
-  if ct2.button("⚡ Oferta"):
-    adicionar_tag("⚡ Oferta")
-  if ct3.button("⭐ Oferta do Dia"):
-    adicionar_tag("⭐ Oferta do Dia")
-
-# --- LINHA 4: CUPOM E OBSERVAÇÕES ---
-col4_left, col4_right = st.columns(2)
-with col4_left:
-  cupom = st.text_input("Cupom de Desconto (Opcional)", placeholder="Ex: DESCONTO10")
-with col4_right:
-  descricao_extra = st.text_area(
-      "Observações (Opcional)", value=st.session_state.obs_val, height=68
-  )
-
-# --- LINHA 5: UPLOAD DE FOTOS (LARGURA TOTAL) ---
-imagens_upload = st.file_uploader(
-    "📸 Selecionar Imagens da Galeria",
-    type=["jpg", "jpeg", "png", "webp"],
-    accept_multiple_files=True,
-    key="uploader_fotos_galeria",
+tab_produto, tab_cupom = st.tabs(
+    ["📦 Oferta de Produto", "🎟️ Divulgação de Cupom"]
 )
 
-if imagens_upload:
-  st.info(f"📷 {len(imagens_upload)} imagem(ns) selecionada(s)!")
-  cols_img = st.columns(min(len(imagens_upload), 4))
-  for idx, img_item in enumerate(imagens_upload):
-    cols_img[idx % 4].image(
-        img_item, caption=f"Foto {idx+1}", use_container_width=True
+# ------------------------------------------
+# ABA 1: PRODUTO (MANTIDA INTEGRALMENTE)
+# ------------------------------------------
+with tab_produto:
+  st.subheader("📝 Preencher Dados da Oferta de Produto")
+
+  if "preco_por_val" not in st.session_state:
+    st.session_state.preco_por_val = ""
+  if "obs_val" not in st.session_state:
+    st.session_state.obs_val = ""
+
+  # --- LINHA 1: TÍTULO E LINK ---
+  col1_left, col1_right = st.columns(2)
+  with col1_left:
+    titulo_produto = st.text_input(
+        "Título do Produto", placeholder='Ex: Smart TV 55" 4K'
+    )
+  with col1_right:
+    link_afiliado = st.text_input(
+        "Link da Oferta / Afiliado", placeholder="https://..."
     )
 
-st.markdown("---")
+  # --- LINHA 2: PREÇO DE E PREÇO POR ---
+  col2_left, col2_right = st.columns(2)
+  with col2_left:
+    preco_de = st.text_input("Preço De (R$)", placeholder="Ex: 1000")
+  with col2_right:
+    preco_por = st.text_input(
+        "Preço Por (R$)",
+        value=st.session_state.preco_por_val,
+        placeholder="Ex: 800",
+    )
+
+  # --- LINHA 3: PAINEL DE BOTÕES RÁPIDOS LADO A LADO ---
+  col3_left, col3_right = st.columns(2)
+
+  # Esquerda: Descontos
+  with col3_left:
+    st.caption("⚡ Cálculo Rápido de Desconto:")
+    cd1, cd2, cd3, cd4, cd5 = st.columns(5)
+
+    def aplicar_desconto(pct):
+      try:
+        val_de = float(
+            preco_de.replace(".", "")
+            .replace(",", ".")
+            .replace("R$", "")
+            .strip()
+        )
+        val_por = val_de * (1 - pct / 100)
+        st.session_state.preco_por_val = f"{val_por:.2f}".replace(".", ",")
+      except ValueError:
+        st.warning("Preencha o 'Preço De' primeiro.")
+
+    if cd1.button("5%", key="btn_5"):
+      aplicar_desconto(5)
+    if cd2.button("10%", key="btn_10"):
+      aplicar_desconto(10)
+    if cd3.button("25%", key="btn_25"):
+      aplicar_desconto(25)
+    if cd4.button("50%", key="btn_50"):
+      aplicar_desconto(50)
+    if cd5.button("Limpar", key="btn_limpar_desc"):
+      st.session_state.preco_por_val = ""
+
+  # Direita: Etiquetas
+  with col3_right:
+    st.caption("📌 Etiquetas Rápida:")
+    ct1, ct2, ct3 = st.columns(3)
+
+    def adicionar_tag(tag_texto):
+      if tag_texto not in st.session_state.obs_val:
+        if st.session_state.obs_val.strip():
+          st.session_state.obs_val += f" | {tag_texto}"
+        else:
+          st.session_state.obs_val = tag_texto
+
+    if ct1.button("🚚 Frete Grátis", key="btn_frete"):
+      adicionar_tag("🚚 Frete Grátis")
+    if ct2.button("⚡ Relâmpago", key="btn_relampago"):
+      adicionar_tag("⚡ Oferta Relâmpago")
+    if ct3.button("⭐ Do Dia", key="btn_dodia"):
+      adicionar_tag("⭐ Oferta do Dia")
+
+  # --- LINHA 4: CUPOM E OBSERVAÇÕES ---
+  col4_left, col4_right = st.columns(2)
+  with col4_left:
+    cupom = st.text_input(
+        "Cupom de Desconto (Opcional)", placeholder="Ex: DESCONTO10"
+    )
+  with col4_right:
+    descricao_extra = st.text_area(
+        "Observações (Opcional)", value=st.session_state.obs_val, height=68
+    )
+
+  # --- LINHA 5: UPLOAD DE FOTOS ---
+  imagens_upload = st.file_uploader(
+      "📸 Selecionar Imagens da Galeria",
+      type=["jpg", "jpeg", "png", "webp"],
+      accept_multiple_files=True,
+      key="uploader_fotos_galeria",
+  )
+
+  if imagens_upload:
+    st.info(f"📷 {len(imagens_upload)} imagem(ns) selecionada(s)!")
+    cols_img = st.columns(min(len(imagens_upload), 4))
+    for idx, img_item in enumerate(imagens_upload):
+      cols_img[idx % 4].image(
+          img_item, caption=f"Foto {idx+1}", use_container_width=True
+      )
+
+  # Montagem do texto do produto
+  texto_gerado_html = (
+      f"🔥 <b>{titulo_produto if titulo_produto else 'OFERTA IMPERDÍVEL'}</b>\n\n"
+  )
+  if preco_de:
+    texto_gerado_html += f"❌ De: R$ {preco_de}\n"
+  if preco_por:
+    texto_gerado_html += f"✅ <b>Por: R$ {preco_por}</b>\n"
+  if cupom:
+    texto_gerado_html += f"🎟️ Cupom: <code>{cupom}</code>\n"
+  if descricao_extra:
+    texto_gerado_html += f"\nℹ️ {descricao_extra}\n"
+  if link_afiliado:
+    texto_gerado_html += f"\n🛒 <b>Compre Aqui:</b> {link_afiliado}"
+
+  texto_wpp = (
+      f"🔥 *{titulo_produto if titulo_produto else 'OFERTA IMPERDÍVEL'}*\n\n"
+  )
+  if preco_de:
+    texto_wpp += f"❌ De: R$ {preco_de}\n"
+  if preco_por:
+    texto_wpp += f"✅ *Por: R$ {preco_por}*\n"
+  if cupom:
+    texto_wpp += f"🎟️ Cupom: {cupom}\n"
+  if descricao_extra:
+    texto_wpp += f"\nℹ️ {descricao_extra}\n"
+  if link_afiliado:
+    texto_wpp += f"\n🛒 *Compre Aqui:* {link_afiliado}"
+
+  link_oferta_envio = link_afiliado
+  imagens_envio = imagens_upload
+  titulo_validacao = titulo_produto
+
+# ------------------------------------------
+# ABA 2: DIVULGAÇÃO DE CUPOM EXCLUSIVO
+# ------------------------------------------
+with tab_cupom:
+  st.subheader("🎟️ Gerador de Oferta de Cupom")
+
+  col_c1, col_c2 = st.columns(2)
+  with col_c1:
+    titulo_cupom = st.text_input(
+        "Título da Promocional / Loja",
+        placeholder="Ex: CUPOM EXCLUSIVO FOREVER LISS NA SHOPEE!",
+    )
+    regras_cupom = st.text_input(
+        "Regra do Desconto",
+        placeholder="Ex: 15% OFF em compras acima de R$ 130 (Desconto de até R$ 30)",
+    )
+    codigo_cupom_loja = st.text_input(
+        "Código do Cupom / Tipo",
+        placeholder="Ex: Aplique o cupom da loja / CÓDIGO15",
+    )
+
+  with col_c2:
+    link_cupom = st.text_input(
+        "Link do Cupom / Afiliado", placeholder="https://...", key="link_cupom"
+    )
+    carrinho_exemplo = st.text_input(
+        "Exemplo - Valor Carrinho (R$)", placeholder="Ex: 140"
+    )
+    pagar_exemplo = st.text_input(
+        "Exemplo - Valor Final a Pagar (R$)", placeholder="Ex: 119"
+    )
+
+  imagens_upload_cupom = st.file_uploader(
+      "📸 Selecionar Banner/Imagem do Cupom (Opcional)",
+      type=["jpg", "jpeg", "png", "webp"],
+      accept_multiple_files=True,
+      key="uploader_fotos_cupom",
+  )
+
+  # Montagem do texto do cupom
+  texto_cupom_html = f"🔥 <b>{titulo_cupom if titulo_cupom else 'CUPOM EXCLUSIVO!'}</b> 🔥\n\n"
+  if regras_cupom:
+    texto_cupom_html += f"⚡ {regras_cupom}\n\n"
+
+  if carrinho_exemplo or pagar_exemplo:
+    texto_cupom_html += "💡 <b>Exemplo de economia:</b>\n"
+    if carrinho_exemplo:
+      texto_cupom_html += (
+          f"🛒 Adicione R$ {carrinho_exemplo} em produtos no carrinho\n"
+      )
+    if codigo_cupom_loja:
+      texto_cupom_html += f"🎟️ {codigo_cupom_loja}\n"
+    if pagar_exemplo:
+      texto_cupom_html += f"💰 <b>Pague apenas R$ {pagar_exemplo}!</b>\n\n"
+
+  if link_cupom:
+    texto_cupom_html += (
+        f"👉 <b>Pegue o cupom e aproveite aqui:</b> {link_cupom}"
+    )
+
+  # Texto limpo para WhatsApp
+  texto_cupom_wpp = f"🔥 *{titulo_cupom if titulo_cupom else 'CUPOM EXCLUSIVO!'}* 🔥\n\n"
+  if regras_cupom:
+    texto_cupom_wpp += f"⚡ {regras_cupom}\n\n"
+
+  if carrinho_exemplo or pagar_exemplo:
+    texto_cupom_wpp += "💡 *Exemplo de economia:*\n"
+    if carrinho_exemplo:
+      texto_cupom_wpp += (
+          f"🛒 Adicione R$ {carrinho_exemplo} em produtos no carrinho\n"
+      )
+    if codigo_cupom_loja:
+      texto_cupom_wpp += f"🎟️ {codigo_cupom_loja}\n"
+    if pagar_exemplo:
+      texto_cupom_wpp += f"💰 *Pague apenas R$ {pagar_exemplo}!*\n\n"
+
+  if link_cupom:
+    texto_cupom_wpp += f"👉 *Pegue o cupom e aproveite aqui:* {link_cupom}"
+
+  st.markdown("---")
+  st.caption("👁️ **Pré-visualização do Texto do Cupom:**")
+  st.code(
+      texto_cupom_wpp.replace("*", "").replace("<b>", "").replace("</b>", "")
+  )
 
 # ==========================================
-# OPÇÕES DE CANAIS (MARCA TEXTO / CHECKBOXES)
+# SEÇÃO COMUM DE ENVIO E REDES SOCIAIS
 # ==========================================
+st.markdown("---")
 st.subheader("🎯 Onde deseja postar?")
 col_chk1, col_chk2 = st.columns(2)
 with col_chk1:
-  enviar_telegram = st.checkbox("📢 Postar no Telegram", value=True)
+  enviar_telegram = st.checkbox(
+      "📢 Postar no Telegram", value=True, key="chk_tg"
+  )
 with col_chk2:
-  enviar_facebook = st.checkbox("📘 Postar no Facebook", value=True)
+  enviar_facebook = st.checkbox(
+      "📘 Postar no Facebook", value=True, key="chk_fb"
+  )
 
 # ==========================================
 # OPÇÕES DE MELHORIA DE FOTO
 # ==========================================
 with st.expander("🎨 Configurações de Melhoria de Foto"):
   aplicar_melhoria = st.checkbox(
-      "Ativar Auto-Melhoria (Nitidez + Contraste)", value=True
+      "Ativar Auto-Melhoria (Nitidez + Contraste)", value=True, key="chk_melhoria"
   )
   c_melh1, c_melh2 = st.columns(2)
   with c_melh1:
@@ -398,6 +528,7 @@ with st.expander("🎨 Configurações de Melhoria de Foto"):
         value=1.8,
         step=0.1,
         disabled=not aplicar_melhoria,
+        key="sld_nitidez",
     )
   with c_melh2:
     val_contraste = st.slider(
@@ -407,52 +538,36 @@ with st.expander("🎨 Configurações de Melhoria de Foto"):
         value=1.15,
         step=0.05,
         disabled=not aplicar_melhoria,
+        key="sld_contraste",
     )
-
-# Montagem dos textos
-texto_gerado_html = (
-    f"🔥 <b>{titulo_produto if titulo_produto else 'OFERTA IMPERDÍVEL'}</b>\n\n"
-)
-if preco_de:
-  texto_gerado_html += f"❌ De: R$ {preco_de}\n"
-if preco_por:
-  texto_gerado_html += f"✅ <b>Por: R$ {preco_por}</b>\n"
-if cupom:
-  texto_gerado_html += f"🎟️ Cupom: <code>{cupom}</code>\n"
-if descricao_extra:
-  texto_gerado_html += f"\nℹ️ {descricao_extra}\n"
-if link_afiliado:
-  texto_gerado_html += f"\n🛒 <b>Compre Aqui:</b> {link_afiliado}"
-
-# Texto formatado limpo para WhatsApp
-texto_wpp = (
-    f"🔥 *{titulo_produto if titulo_produto else 'OFERTA IMPERDÍVEL'}*\n\n"
-)
-if preco_de:
-  texto_wpp += f"❌ De: R$ {preco_de}\n"
-if preco_por:
-  texto_wpp += f"✅ *Por: R$ {preco_por}*\n"
-if cupom:
-  texto_wpp += f"🎟️ Cupom: {cupom}\n"
-if descricao_extra:
-  texto_wpp += f"\nℹ️ {descricao_extra}\n"
-if link_afiliado:
-  texto_wpp += f"\n🛒 *Compre Aqui:* {link_afiliado}"
 
 st.markdown("---")
 
 col_btn1, col_btn2 = st.columns([2, 1])
+
+# Seleção automática de qual conteúdo enviar com base na aba ativa na tela
+# Nota: O Streamlit renderiza os dois, então verificamos qual conteúdo foi preenchido
+usar_cupom = bool(titulo_cupom or link_cupom)
+
+texto_final_html = texto_cupom_html if usar_cupom else texto_gerado_html
+texto_final_wpp = texto_cupom_wpp if usar_cupom else texto_wpp
+link_final_envio = link_cupom if usar_cupom else link_oferta_envio
+imagens_final_envio = (
+    imagens_upload_cupom if usar_cupom else imagens_envio
+)
+validacao_titulo = titulo_cupom if usar_cupom else titulo_validacao
 
 with col_btn1:
   if st.button(
       "🚀 Postar Oferta nos Canais Selecionados",
       type="primary",
       use_container_width=True,
+      key="btn_postar_geral",
   ):
     if not enviar_telegram and not enviar_facebook:
       st.warning("Selecione ao menos um canal (Telegram ou Facebook).")
-    elif not titulo_produto and not link_afiliado:
-      st.warning("Preencha ao menos o Título e o Link do produto.")
+    elif not validacao_titulo and not link_final_envio:
+      st.warning("Preencha ao menos o Título e o Link da Oferta/Cupom.")
     else:
       st.info("Processando lote de imagens e enviando...")
 
@@ -460,9 +575,9 @@ with col_btn1:
         st_fb, msg_fb = postar_no_facebook(
             FB_PAGE_ID_FIXO,
             FB_PAGE_TOKEN_FIXO,
-            texto_gerado_html,
-            imagens_upload,
-            link_afiliado,
+            texto_final_html,
+            imagens_final_envio,
+            link_final_envio,
             aplicar_melhoria,
             val_nitidez,
             val_contraste,
@@ -476,8 +591,8 @@ with col_btn1:
         st_tg, msg_tg = postar_no_telegram(
             TELEGRAM_BOT_TOKEN_FIXO,
             TELEGRAM_CHAT_ID_FIXO,
-            texto_gerado_html,
-            imagens_upload,
+            texto_final_html,
+            imagens_final_envio,
             aplicar_melhoria,
             val_nitidez,
             val_contraste,
@@ -488,10 +603,7 @@ with col_btn1:
           st.error(f"❌ **Telegram:** {msg_tg}")
 
 with col_btn2:
-  # ==========================================
-  # COMPARTILHAR NO WHATSAPP
-  # ==========================================
-  texto_encoded = urllib.parse.quote(texto_wpp)
+  texto_encoded = urllib.parse.quote(texto_final_wpp)
   link_whatsapp = f"https://api.whatsapp.com/send?text={texto_encoded}"
   st.markdown(
       f"""
@@ -499,17 +611,4 @@ with col_btn2:
           <div style="
               background-color: #25D366;
               color: white;
-              padding: 10px;
-              text-align: center;
-              border-radius: 8px;
-              font-weight: bold;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              gap: 8px;">
-              🟢 Compartilhar no WhatsApp
-          </div>
-      </a>
-      """,
-      unsafe_allow_html=True,
-    )
+          
