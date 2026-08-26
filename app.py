@@ -68,7 +68,7 @@ def postar_facebook(texto, imagens, link, melhoria, modo, nitidez, contraste):
             return ("id" in res or "post_id" in res), "Sucesso!" if ("id" in res or "post_id" in res) else "Erro no envio."
         elif len(imgs) == 1:
             payload = {"caption": legenda, "access_token": FB_PAGE_TOKEN, "link": link or ""}
-            res = requests.post(f"https://graph.facebook.com/v26.0/{FB_PAGE_ID}/photos", data=payload, files={"source": (imgs[0].name, imgs[0].getvalue(), "image/jpeg")}, timeout=40).json()
+            res = requests.post(f"https://graph.facebook.com/v26.0/{FB_PAGE_ID}/photos", data={"source": (imgs[0].name, imgs[0].getvalue(), "image/jpeg")}, timeout=40).json()
             return ("id" in res or "post_id" in res), "Sucesso!" if ("id" in res or "post_id" in res) else "Erro no envio."
         else:
             media_ids = []
@@ -229,124 +229,24 @@ with tab_cupom:
 # ---------------------------------------------------------------------
 # CAIXA DE RASCUNHO FLUTUANTE - COM PINÇA, TOUCH E RECUPERAÇÃO
 # ---------------------------------------------------------------------
-components.html(r'''
+html_rascunho = """
 <script>
     (function() {
         const parentDoc = window.parent.document;
-        
         if (parentDoc.getElementById("rascunho-box")) return;
 
-        // 1. Criar Botão Flutuante de Recuperação (Minimizado)
         const fab = parentDoc.createElement("button");
         fab.id = "rascunho-fab";
         fab.title = "Abrir Rascunho";
         fab.innerText = "📝";
-        fab.style.cssText = `
-            position: fixed;
-            bottom: 25px;
-            right: 25px;
-            width: 52px;
-            height: 52px;
-            border-radius: 50%;
-            background: #007bff;
-            color: white;
-            border: none;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
-            font-size: 22px;
-            cursor: pointer;
-            z-index: 9999998;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            user-select: none;
-            touch-action: manipulation;
-        `;
+        fab.style.cssText = "position: fixed; bottom: 25px; right: 25px; width: 52px; height: 52px; border-radius: 50%; background: #007bff; color: white; border: none; box-shadow: 0 4px 16px rgba(0,0,0,0.3); font-size: 22px; cursor: pointer; z-index: 9999998; display: none; align-items: center; justify-content: center; user-select: none; touch-action: manipulation;";
         parentDoc.body.appendChild(fab);
 
-        // 2. Criar Container Principal da Caixa
         const box = parentDoc.createElement("div");
         box.id = "rascunho-box";
-        box.style.cssText = `
-            position: fixed;
-            top: 70px;
-            right: 25px;
-            width: 320px;
-            height: 250px;
-            background: #ffffff;
-            border: 2px solid #007bff;
-            border-radius: 12px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.25);
-            z-index: 9999999;
-            display: flex;
-            flex-direction: column;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            resize: both;
-            overflow: hidden;
-            min-width: 220px;
-            min-height: 150px;
-            touch-action: none;
-        `;
+        box.style.cssText = "position: fixed; top: 70px; right: 25px; width: 320px; height: 250px; background: #ffffff; border: 2px solid #007bff; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.25); z-index: 9999999; display: flex; flex-direction: column; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; resize: both; overflow: hidden; min-width: 220px; min-height: 150px; touch-action: none;";
 
-        box.innerHTML = `
-            <div id="rascunho-header" style="
-                background: #007bff;
-                color: white;
-                padding: 8px 12px;
-                cursor: grab;
-                font-weight: 600;
-                font-size: 13px;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                user-select: none;
-                touch-action: none;
-            ">
-                <span>📝 Rascunho Flutuante</span>
-                <div style="display: flex; gap: 6px; align-items: center;">
-                    <button id="rascunho-copy" style="
-                        background: rgba(255,255,255,0.2);
-                        border: none;
-                        color: white;
-                        font-size: 11px;
-                        padding: 3px 6px;
-                        border-radius: 4px;
-                        cursor: pointer;
-                    ">📋 Copiar</button>
-                    <button id="rascunho-clear" style="
-                        background: rgba(255,255,255,0.2);
-                        border: none;
-                        color: white;
-                        font-size: 11px;
-                        padding: 3px 6px;
-                        border-radius: 4px;
-                        cursor: pointer;
-                    ">🗑️</button>
-                    <button id="rascunho-close" style="
-                        background: transparent;
-                        border: none;
-                        color: white;
-                        font-size: 16px;
-                        cursor: pointer;
-                        margin-left: 4px;
-                        font-weight: bold;
-                    ">✕</button>
-                </div>
-            </div>
-            <textarea id="rascunho-text" placeholder="Cole aqui seus textos ou rascunhos..." style="
-                flex: 1;
-                width: 100%;
-                padding: 10px;
-                border: none;
-                outline: none;
-                resize: none;
-                font-size: 13px;
-                line-height: 1.4;
-                box-sizing: border-box;
-                background: #fdfdfd;
-                color: #222;
-                touch-action: pan-y;
-            "></textarea>
-        `;
+        box.innerHTML = '<div id="rascunho-header" style="background: #007bff; color: white; padding: 8px 12px; cursor: grab; font-weight: 600; font-size: 13px; display: flex; justify-content: space-between; align-items: center; user-select: none; touch-action: none;"><span>📝 Rascunho Flutuante</span><div style="display: flex; gap: 6px; align-items: center;"><button id="rascunho-copy" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 11px; padding: 3px 6px; border-radius: 4px; cursor: pointer;">📋 Copiar</button><button id="rascunho-clear" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 11px; padding: 3px 6px; border-radius: 4px; cursor: pointer;">🗑️</button><button id="rascunho-close" style="background: transparent; border: none; color: white; font-size: 16px; cursor: pointer; margin-left: 4px; font-weight: bold;">✕</button></div></div><textarea id="rascunho-text" placeholder="Cole aqui seus textos ou rascunhos..." style="flex: 1; width: 100%; padding: 10px; border: none; outline: none; resize: none; font-size: 13px; line-height: 1.4; box-sizing: border-box; background: #fdfdfd; color: #222; touch-action: pan-y;"></textarea>';
 
         parentDoc.body.appendChild(box);
 
@@ -361,7 +261,6 @@ components.html(r'''
         let initialPinchDist = null;
         let initialSize = { w: 0, h: 0 };
 
-        // --- ARRASTAR (Mouse e Toque) ---
         function startDrag(e) {
             if (e.target.tagName === "BUTTON") return;
             isDragging = true;
@@ -376,13 +275,10 @@ components.html(r'''
             if (!isDragging) return;
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
             let left = clientX - offsetX;
             let top = clientY - offsetY;
-
             left = Math.max(0, Math.min(left, window.parent.innerWidth - box.offsetWidth));
             top = Math.max(0, Math.min(top, window.parent.innerHeight - box.offsetHeight));
-
             box.style.left = left + "px";
             box.style.top = top + "px";
             box.style.right = "auto";
@@ -401,7 +297,6 @@ components.html(r'''
         parentDoc.addEventListener("touchmove", moveDrag, { passive: true });
         parentDoc.addEventListener("touchend", stopDrag);
 
-        // --- MODO PINÇA / REDIMENSIONAR COM 2 DEDOS (Pinch-to-Resize) ---
         function getDistance(t1, t2) {
             const dx = t1.clientX - t2.clientX;
             const dy = t1.clientY - t2.clientY;
@@ -419,13 +314,44 @@ components.html(r'''
             if (e.touches.length === 2 && initialPinchDist) {
                 const currentDist = getDistance(e.touches[0], e.touches[1]);
                 const scale = currentDist / initialPinchDist;
-
                 const newW = Math.max(220, Math.min(initialSize.w * scale, window.parent.innerWidth - 20));
                 const newH = Math.max(150, Math.min(initialSize.h * scale, window.parent.innerHeight - 20));
-
                 box.style.width = newW + "px";
                 box.style.height = newH + "px";
             }
         }, { passive: true });
 
-   
+        box.addEventListener("touchend", (e) => {
+            if (e.touches.length < 2) {
+                initialPinchDist = null;
+            }
+        });
+
+        closeBtn.addEventListener("click", () => {
+            box.style.display = "none";
+            fab.style.display = "flex";
+        });
+
+        fab.addEventListener("click", () => {
+            box.style.display = "flex";
+            fab.style.display = "none";
+        });
+
+        clearBtn.addEventListener("click", () => {
+            if (textarea.value.trim() && confirm("Deseja limpar todo o rascunho?")) {
+                textarea.value = "";
+            }
+        });
+
+        copyBtn.addEventListener("click", () => {
+            if (!textarea.value) return;
+            navigator.clipboard.writeText(textarea.value);
+            const orig = copyBtn.innerText;
+            copyBtn.innerText = "✅ Copiado!";
+            setTimeout(() => copyBtn.innerText = orig, 1500);
+        });
+    })();
+</script>
+"""
+
+components.html(html_rascunho, height=0)
