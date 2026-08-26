@@ -269,7 +269,7 @@ tab_produto, tab_cupom = st.tabs(
 )
 
 # ------------------------------------------
-# ABA 1: PRODUTO (MANTIDA INTEGRALMENTE)
+# ABA 1: PRODUTO
 # ------------------------------------------
 with tab_produto:
   st.subheader("📝 Preencher Dados da Oferta de Produto")
@@ -605,9 +605,8 @@ with col_btn2:
   texto_encoded = urllib.parse.quote(texto_final_wpp)
   link_whatsapp = f"https://api.whatsapp.com/send?text={texto_encoded}"
 
-  html_wpp = (
-      f'<a href="{link_whatsapp}" target="_blank" style="text-decoration:'
-      ' none;"><div style="background-color: #25D366; color: white; padding:'
-      " 10px; text-align: center; border-radius: 8px; font-weight: bold;"
-      ' display: flex; align-items: center; justify-content: center; gap:'
-     
+  html_wpp = f"""
+    <a href="{link_whatsapp}" target="_blank" style="text-decoration: none;">
+        <div style="background-color: #25D366; color: white; padding: 10px; text-align: center; border-radius: 8px; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            🟢 Compartilhar no WhatsApp
+        
