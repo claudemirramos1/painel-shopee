@@ -22,12 +22,13 @@ st.title("🛍️ Painel de Automação de Ofertas")
 
 
 # ==========================================
-# PROCESSAMENTO E MELHORIA DE FOTO
+# PROCESSAMENTO E MELHORIA DE FOTO (SEM DISTORÇÃO)
 # ==========================================
 def processar_imagem_segura(
     imagem_upload,
     aplicar_melhoria=True,
-    target_size=(1080, 1350),
+    modo_redimensionar="Manter Proporção (Fundo Branco)",
+    max_dim=1200,
     nitidez_val=1.8,
     contraste_val=1.15,
 ):
@@ -40,9 +41,17 @@ def processar_imagem_segura(
     if img.mode in ("RGBA", "P"):
       img = img.convert("RGB")
 
-    img_ajustada = ImageOps.fit(
-        img, target_size, method=Image.Resampling.LANCZOS, centering=(0.5, 0.5)
-    )
+    # Tratamento para NÃO DISTORCER
+    if modo_redimensionar == "Manter Proporção (Fundo Branco)":
+      # Adiciona margem/fundo branco proporcional sem esticar a imagem
+      target_size = (max_dim, max_dim)
+      img_ajustada = ImageOps.pad(
+          img, target_size, color=(255, 255, 255), centering=(0.5, 0.5)
+      )
+    else:
+      # Apenas redimensiona proporcionalmente mantendo formato original
+      img_ajustada = img.copy()
+      img_ajustada.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
 
     if aplicar_melhoria:
       enhancer_sharpness = ImageEnhance.Sharpness(img_ajustada)
@@ -70,7 +79,14 @@ def processar_imagem_segura(
 # ENVIO TELEGRAM
 # ==========================================
 def postar_no_telegram(
-    token, chat_id, texto, lista_imagens, aplicar_melhoria, nitidez, contraste
+    token,
+    chat_id,
+    texto,
+    lista_imagens,
+    aplicar_melhoria,
+    modo_redim,
+    nitidez,
+    contraste,
 ):
   if not token or not chat_id:
     return False, "Token ou Chat ID do Telegram não informados."
@@ -81,6 +97,7 @@ def postar_no_telegram(
         proc = processar_imagem_segura(
             img_raw,
             aplicar_melhoria=aplicar_melhoria,
+            modo_redimensionar=modo_redim,
             nitidez_val=nitidez,
             contraste_val=contraste,
         )
@@ -153,6 +170,7 @@ def postar_no_facebook(
     lista_imagens,
     link_oferta,
     aplicar_melhoria,
+    modo_redim,
     nitidez,
     contraste,
 ):
@@ -172,6 +190,7 @@ def postar_no_facebook(
         proc = processar_imagem_segura(
             img_raw,
             aplicar_melhoria=aplicar_melhoria,
+            modo_redimensionar=modo_redim,
             nitidez_val=nitidez,
             contraste_val=contraste,
         )
@@ -267,6 +286,12 @@ def postar_no_facebook(
 tab_produto, tab_cupom = st.tabs(
     ["📦 Oferta de Produto", "🎟️ Divulgação de Cupom"]
 )
+
+texto_gerado_html = ""
+texto_wpp = ""
+link_oferta_envio = ""
+imagens_envio = []
+titulo_validacao = ""
 
 # ------------------------------------------
 # ABA 1: PRODUTO
@@ -372,33 +397,36 @@ with tab_produto:
           img_item, caption=f"Foto {idx+1}", use_container_width=True
       )
 
-  texto_gerado_html = (
-      f"🔥 <b>{titulo_produto if titulo_produto else 'OFERTA IMPERDÍVEL'}</b>\n\n"
-  )
-  if preco_de:
-    texto_gerado_html += f"❌ De: R$ {preco_de}\n"
-  if preco_por:
-    texto_gerado_html += f"✅ <b>Por: R$ {preco_por}</b>\n"
-  if cupom:
-    texto_gerado_html += f"🎟️ Cupom: <code>{cupom}</code>\n"
-  if descricao_extra:
-    texto_gerado_html += f"\nℹ️ {descricao_extra}\n"
-  if link_afiliado:
-    texto_gerado_html += f"\n🛒 <b>Compre Aqui:</b> {link_afiliado}"
+  # Montagem limpa do texto
+  partes_html = []
+  partes_wpp = []
 
-  texto_wpp = (
-      f"🔥 *{titulo_produto if titulo_produto else 'OFERTA IMPERDÍVEL'}*\n\n"
-  )
+  if titulo_produto:
+    partes_html.append(f"🔥 <b>{titulo_produto.strip()}</b>")
+    partes_wpp.append(f"🔥 *{titulo_produto.strip()}*")
+
   if preco_de:
-    texto_wpp += f"❌ De: R$ {preco_de}\n"
+    partes_html.append(f"❌ De: R$ {preco_de.strip()}")
+    partes_wpp.append(f"❌ De: R$ {preco_de.strip()}")
+
   if preco_por:
-    texto_wpp += f"✅ *Por: R$ {preco_por}*\n"
+    partes_html.append(f"✅ <b>Por: R$ {preco_por.strip()}</b>")
+    partes_wpp.append(f"✅ *Por: R$ {preco_por.strip()}*")
+
   if cupom:
-    texto_wpp += f"🎟️ Cupom: {cupom}\n"
+    partes_html.append(f"🎟️ Cupom: <code>{cupom.strip()}</code>")
+    partes_wpp.append(f"🎟️ Cupom: {cupom.strip()}")
+
   if descricao_extra:
-    texto_wpp += f"\nℹ️ {descricao_extra}\n"
+    partes_html.append(f"ℹ️ {descricao_extra.strip()}")
+    partes_wpp.append(f"ℹ️ {descricao_extra.strip()}")
+
   if link_afiliado:
-    texto_wpp += f"\n🛒 *Compre Aqui:* {link_afiliado}"
+    partes_html.append(f"🛒 <b>Compre Aqui:</b> {link_afiliado.strip()}")
+    partes_wpp.append(f"🛒 *Compre Aqui:* {link_afiliado.strip()}")
+
+  texto_gerado_html = "\n\n".join(partes_html)
+  texto_wpp = "\n\n".join(partes_wpp)
 
   link_oferta_envio = link_afiliado
   imagens_envio = imagens_upload
@@ -407,6 +435,12 @@ with tab_produto:
 # ------------------------------------------
 # ABA 2: DIVULGAÇÃO DE CUPOM EXCLUSIVO
 # ------------------------------------------
+texto_cupom_html = ""
+texto_cupom_wpp = ""
+titulo_cupom = ""
+link_cupom = ""
+imagens_upload_cupom = []
+
 with tab_cupom:
   st.subheader("🎟️ Gerador de Oferta de Cupom")
 
@@ -418,40 +452,39 @@ with tab_cupom:
     )
     regras_cupom = st.text_input(
         "Regra do Desconto",
-        placeholder="Ex: 15% OFF em compras acima de R$ 130 (Desconto de até R$ 30)",
+        placeholder="Ex: 15% OFF em compras acima de R$ 130",
     )
     codigo_cupom_loja = st.text_input(
-        "Código do Cupom / Tipo",
-        placeholder="Ex: Aplique o cupom da loja / CÓDIGO15",
+        "Código do Cupom / Instrução",
+        placeholder="Ex: Aplique o cupom da loja",
     )
     link_cupom = st.text_input(
         "Link do Cupom / Afiliado", placeholder="https://...", key="link_cupom"
     )
 
   with col_c2:
-    st.markdown("### 🧮 Cálculo do Exemplo de Economia")
+    st.markdown("### 🧮 Exemplo Prático de Economia")
 
     carrinho_exemplo = st.text_input(
-        "Exemplo - Valor Carrinho (R$)", value="130", placeholder="Ex: 130"
+        "Exemplo - Valor Carrinho (R$)", placeholder="Ex: 130"
     )
 
     porcentagem_cupom = st.text_input(
         "Desconto em Porcentagem (%)", placeholder="Ex: 15"
     )
 
-    # Cálculo Automático do Valor a Pagar
+    # Cálculo Automático
     pagar_calculado = ""
-    if carrinho_exemplo:
+    if carrinho_exemplo and porcentagem_cupom:
       try:
         val_carrinho = float(
             carrinho_exemplo.replace(".", "").replace(",", ".").strip()
         )
-        if porcentagem_cupom:
-          val_pct = float(
-              porcentagem_cupom.replace("%", "").replace(",", ".").strip()
-          )
-          val_final = val_carrinho * (1 - val_pct / 100)
-          pagar_calculado = f"{val_final:.2f}".replace(".", ",")
+        val_pct = float(
+            porcentagem_cupom.replace("%", "").replace(",", ".").strip()
+        )
+        val_final = val_carrinho * (1 - val_pct / 100)
+        pagar_calculado = f"{val_final:.2f}".replace(".", ",")
       except ValueError:
         pass
 
@@ -468,46 +501,53 @@ with tab_cupom:
       key="uploader_fotos_cupom",
   )
 
-  texto_cupom_html = f"🔥 <b>{titulo_cupom if titulo_cupom else 'CUPOM EXCLUSIVO!'}</b> 🔥\n\n"
-  if regras_cupom:
-    texto_cupom_html += f"⚡ {regras_cupom}\n\n"
+  # Construção Condicional do Texto do Cupom (Só inclui o que for preenchido)
+  p_html = []
+  p_wpp = []
 
-  if carrinho_exemplo or pagar_exemplo:
-    texto_cupom_html += "💡 <b>Exemplo de economia:</b>\n"
-    if carrinho_exemplo:
-      texto_cupom_html += (
-          f"🛒 Adicione R$ {carrinho_exemplo} em produtos no carrinho\n"
-      )
-    if codigo_cupom_loja:
-      texto_cupom_html += f"🎟️ {codigo_cupom_loja}\n"
-    if pagar_exemplo:
-      texto_cupom_html += f"💰 <b>Pague apenas R$ {pagar_exemplo}!</b>\n\n"
+  if titulo_cupom.strip():
+    p_html.append(f"🔥 <b>{titulo_cupom.strip()}</b> 🔥")
+    p_wpp.append(f"🔥 *{titulo_cupom.strip()}* 🔥")
 
-  if link_cupom:
-    texto_cupom_html += (
-        f"👉 <b>Pegue o cupom e aproveite aqui:</b> {link_cupom}"
+  if regras_cupom.strip():
+    p_html.append(f"⚡ {regras_cupom.strip()}")
+    p_wpp.append(f"⚡ {regras_cupom.strip()}")
+
+  # Bloco de Exemplo de Economia
+  bloco_ex_html = []
+  bloco_ex_wpp = []
+
+  if carrinho_exemplo.strip():
+    bloco_ex_html.append(
+        f"🛒 Adicione R$ {carrinho_exemplo.strip()} em produtos no carrinho"
+    )
+    bloco_ex_wpp.append(
+        f"🛒 Adicione R$ {carrinho_exemplo.strip()} em produtos no carrinho"
     )
 
-  texto_cupom_wpp = f"🔥 *{titulo_cupom if titulo_cupom else 'CUPOM EXCLUSIVO!'}* 🔥\n\n"
-  if regras_cupom:
-    texto_cupom_wpp += f"⚡ {regras_cupom}\n\n"
+  if codigo_cupom_loja.strip():
+    bloco_ex_html.append(f"🎟️ {codigo_cupom_loja.strip()}")
+    bloco_ex_wpp.append(f"🎟️ {codigo_cupom_loja.strip()}")
 
-  if carrinho_exemplo or pagar_exemplo:
-    texto_cupom_wpp += "💡 *Exemplo de economia:*\n"
-    if carrinho_exemplo:
-      texto_cupom_wpp += (
-          f"🛒 Adicione R$ {carrinho_exemplo} em produtos no carrinho\n"
-      )
-    if codigo_cupom_loja:
-      texto_cupom_wpp += f"🎟️ {codigo_cupom_loja}\n"
-    if pagar_exemplo:
-      texto_cupom_wpp += f"💰 *Pague apenas R$ {pagar_exemplo}!*\n\n"
+  if pagar_exemplo.strip():
+    bloco_ex_html.append(f"💰 <b>Pague apenas R$ {pagar_exemplo.strip()}!</b>")
+    bloco_ex_wpp.append(f"💰 *Pague apenas R$ {pagar_exemplo.strip()}!*")
 
-  if link_cupom:
-    texto_cupom_wpp += f"👉 *Pegue o cupom e aproveite aqui:* {link_cupom}"
+  if bloco_ex_html:
+    p_html.append("💡 <b>Exemplo de economia:</b>\n" + "\n".join(bloco_ex_html))
+    p_wpp.append("💡 *Exemplo de economia:*\n" + "\n".join(bloco_ex_wpp))
+
+  if link_cupom.strip():
+    p_html.append(
+        f"👉 <b>Pegue o cupom e aproveite aqui:</b> {link_cupom.strip()}"
+    )
+    p_wpp.append(f"👉 *Pegue o cupom e aproveite aqui:* {link_cupom.strip()}")
+
+  texto_cupom_html = "\n\n".join(p_html)
+  texto_cupom_wpp = "\n\n".join(p_wpp)
 
   st.markdown("---")
-  st.caption("👁️ **Pré-visualização do Texto do Cupom:**")
+  st.caption("👁️ **Pré-visualização do Texto Gerado:**")
   st.code(
       texto_cupom_wpp.replace("*", "").replace("<b>", "").replace("</b>", "")
   )
@@ -528,11 +568,20 @@ with col_chk2:
   )
 
 # ==========================================
-# OPÇÕES DE MELHORIA DE FOTO
+# OPÇÕES DE REDIMENSIONAMENTO E MELHORIA
 # ==========================================
-with st.expander("🎨 Configurações de Melhoria de Foto"):
+with st.expander("🎨 Configurações de Imagem (Ajuste sem Distorcer)"):
+  modo_redim = st.radio(
+      "Modo de Ajuste de Imagem:",
+      [
+          "Manter Proporção (Fundo Branco)",
+          "Manter Formato Original (Apenas Reduzir)",
+      ],
+      index=0,
+  )
+
   aplicar_melhoria = st.checkbox(
-      "Ativar Auto-Melhoria (Nitidez + Contraste)", value=True, key="chk_melhoria"
+      "Ativar Nitidez + Contraste", value=True, key="chk_melhoria"
   )
   c_melh1, c_melh2 = st.columns(2)
   with c_melh1:
@@ -560,6 +609,7 @@ st.markdown("---")
 
 col_btn1, col_btn2 = st.columns([2, 1])
 
+# Seleção automática de qual aba o usuário está usando
 usar_cupom = bool(titulo_cupom or link_cupom)
 
 texto_final_html = texto_cupom_html if usar_cupom else texto_gerado_html
@@ -579,44 +629,4 @@ with col_btn1:
   ):
     if not enviar_telegram and not enviar_facebook:
       st.warning("Selecione ao menos um canal (Telegram ou Facebook).")
-    elif not validacao_titulo and not link_final_envio:
-      st.warning("Preencha ao menos o Título e o Link da Oferta/Cupom.")
-    else:
-      st.info("Processando lote de imagens e enviando...")
-
-      if enviar_facebook:
-        st_fb, msg_fb = postar_no_facebook(
-            FB_PAGE_ID_FIXO,
-            FB_PAGE_TOKEN_FIXO,
-            texto_final_html,
-            imagens_final_envio,
-            link_final_envio,
-            aplicar_melhoria,
-            val_nitidez,
-            val_contraste,
-        )
-        if st_fb:
-          st.success(f"✅ **Facebook:** {msg_fb}")
-        else:
-          st.error(f"❌ **Facebook:** {msg_fb}")
-
-      if enviar_telegram:
-        st_tg, msg_tg = postar_no_telegram(
-            TELEGRAM_BOT_TOKEN_FIXO,
-            TELEGRAM_CHAT_ID_FIXO,
-            texto_final_html,
-            imagens_final_envio,
-            aplicar_melhoria,
-            val_nitidez,
-            val_contraste,
-        )
-        if st_tg:
-          st.success(f"✅ **Telegram:** {msg_tg}")
-        else:
-          st.error(f"❌ **Telegram:** {msg_tg}")
-
-with col_btn2:
-  texto_encoded = urllib.parse.quote(texto_final_wpp)
-  link_whatsapp = f"https://api.whatsapp.com/send?text={texto_encoded}"
-
-  html_
+    elif not 
