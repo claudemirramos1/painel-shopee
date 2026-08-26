@@ -93,7 +93,7 @@ with st.expander("⚙️ Configurações de Envio e Imagem", expanded=True):
     nit = c_img3.slider("Nitidez", 1.0, 3.0, 1.8)
     cont = c_img3.slider("Contraste", 1.0, 2.0, 1.15)
 
-def executar_envio(txt_html, txt_wpp, imgs, link, titulo):
+def executar_envio(txt_html, txt_wpp, imgs, link, titulo, enviar_foto_fb=True, enviar_foto_tg=True):
     if not (env_tg or env_fb): 
         st.warning("Selecione ao menos um canal de envio.")
         return
@@ -103,13 +103,15 @@ def executar_envio(txt_html, txt_wpp, imgs, link, titulo):
         
     with st.spinner("Enviando..."):
         if env_fb:
-            ok, msg = postar_facebook(txt_html, imgs, link, melhorar, modo_r, nit, cont)
+            imgs_fb = imgs if enviar_foto_fb else []
+            ok, msg = postar_facebook(txt_html, imgs_fb, link, melhorar, modo_r, nit, cont)
             if ok:
                 st.success(f"Facebook: {msg}")
             else:
                 st.error(f"Facebook: {msg}")
         if env_tg:
-            ok, msg = postar_telegram(txt_html, imgs, melhorar, modo_r, nit, cont)
+            imgs_tg = imgs if enviar_foto_tg else []
+            ok, msg = postar_telegram(txt_html, imgs_tg, melhorar, modo_r, nit, cont)
             if ok:
                 st.success(f"Telegram: {msg}")
             else:
@@ -127,6 +129,11 @@ with tab_prod:
     cupom_p = c1.text_input("Cupom (Opcional)", key="cp")
     obs_p = c2.text_area("Observações", height=68, key="obsp")
     imgs_p = st.file_uploader("📸 Fotos do Produto", type=["jpg","png","webp"], accept_multiple_files=True, key="up_p")
+
+    # Opções para envio de fotos por rede (Produto)
+    col_img_fb_p, col_img_tg_p = st.columns(2)
+    env_foto_fb_p = col_img_fb_p.checkbox("📷 Enviar foto no Facebook", value=True, key="ef_fb_p")
+    env_foto_tg_p = col_img_tg_p.checkbox("📷 Enviar foto no Telegram", value=True, key="ef_tg_p")
 
     p_wpp_list = []
     if titulo_p: p_wpp_list.append(f"🔥 *{titulo_p}*")
@@ -150,7 +157,7 @@ with tab_prod:
             if link_p: p_html_list.append(f"🛒 <b>Compre Aqui:</b> {link_p}")
             txt_p_html = "\n\n".join(p_html_list)
             
-            executar_envio(txt_p_html, txt_p_wpp, imgs_p, link_p, titulo_p)
+            executar_envio(txt_p_html, txt_p_wpp, imgs_p, link_p, titulo_p, env_foto_fb_p, env_foto_tg_p)
     with cb2:
         wpp_url = f"https://api.whatsapp.com/send?text={urllib.parse.quote(txt_p_wpp)}"
         st.markdown(f'<a href="{wpp_url}" target="_blank" style="text-decoration:none;"><div style="background:#25D366;color:white;padding:10px;text-align:center;border-radius:8px;font-weight:bold;">🟢 WhatsApp Produto</div></a>', unsafe_allow_html=True)
@@ -164,6 +171,11 @@ with tab_cupom:
     cod_c = c1.text_input("Código do Cupom", key="cc")
     link_c = c1.text_input("Link do Cupom", key="lc")
     imgs_c = st.file_uploader("📸 Banner Cupom", type=["jpg","png","webp"], accept_multiple_files=True, key="up_c")
+
+    # Opções para envio de fotos por rede (Cupom)
+    col_img_fb_c, col_img_tg_c = st.columns(2)
+    env_foto_fb_c = col_img_fb_c.checkbox("📷 Enviar foto no Facebook", value=True, key="ef_fb_c")
+    env_foto_tg_c = col_img_tg_c.checkbox("📷 Enviar foto no Telegram", value=True, key="ef_tg_c")
 
     regra_auto = ""
     pagar_calc = ""
@@ -206,7 +218,7 @@ with tab_cupom:
             if link_c: ch.append(f"👉 <b>Pegue aqui:</b> {link_c}")
             txt_c_html = "\n\n".join(ch)
 
-            executar_envio(txt_c_html, txt_c_wpp, imgs_c, link_c, titulo_c)
+            executar_envio(txt_c_html, txt_c_wpp, imgs_c, link_c, titulo_c, env_foto_fb_c, env_foto_tg_c)
     with cb2:
         wpp_url_c = f"https://api.whatsapp.com/send?text={urllib.parse.quote(txt_c_wpp)}"
         st.markdown(f'<a href="{wpp_url_c}" target="_blank" style="text-decoration:none;"><div style="background:#25D366;color:white;padding:10px;text-align:center;border-radius:8px;font-weight:bold;">🟢 WhatsApp Cupom</div></a>', unsafe_allow_html=True)
