@@ -22,7 +22,7 @@ st.title("🛍️ Painel de Automação de Ofertas")
 
 
 # ==========================================
-# PROCESSAMENTO E MELHORIA DE FOTO (SEM DISTORÇÃO)
+# PROCESSAMENTO DE FOTO (SEM DISTORÇÃO)
 # ==========================================
 def processar_imagem_segura(
     imagem_upload,
@@ -41,15 +41,12 @@ def processar_imagem_segura(
     if img.mode in ("RGBA", "P"):
       img = img.convert("RGB")
 
-    # Tratamento para NÃO DISTORCER
     if modo_redimensionar == "Manter Proporção (Fundo Branco)":
-      # Adiciona margem/fundo branco proporcional sem esticar a imagem
       target_size = (max_dim, max_dim)
       img_ajustada = ImageOps.pad(
           img, target_size, color=(255, 255, 255), centering=(0.5, 0.5)
       )
     else:
-      # Apenas redimensiona proporcionalmente mantendo formato original
       img_ajustada = img.copy()
       img_ajustada.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
 
@@ -397,7 +394,6 @@ with tab_produto:
           img_item, caption=f"Foto {idx+1}", use_container_width=True
       )
 
-  # Montagem limpa do texto
   partes_html = []
   partes_wpp = []
 
@@ -473,7 +469,6 @@ with tab_cupom:
         "Desconto em Porcentagem (%)", placeholder="Ex: 15"
     )
 
-    # Cálculo Automático
     pagar_calculado = ""
     if carrinho_exemplo and porcentagem_cupom:
       try:
@@ -501,7 +496,6 @@ with tab_cupom:
       key="uploader_fotos_cupom",
   )
 
-  # Construção Condicional do Texto do Cupom (Só inclui o que for preenchido)
   p_html = []
   p_wpp = []
 
@@ -513,7 +507,6 @@ with tab_cupom:
     p_html.append(f"⚡ {regras_cupom.strip()}")
     p_wpp.append(f"⚡ {regras_cupom.strip()}")
 
-  # Bloco de Exemplo de Economia
   bloco_ex_html = []
   bloco_ex_wpp = []
 
@@ -609,7 +602,6 @@ st.markdown("---")
 
 col_btn1, col_btn2 = st.columns([2, 1])
 
-# Seleção automática de qual aba o usuário está usando
 usar_cupom = bool(titulo_cupom or link_cupom)
 
 texto_final_html = texto_cupom_html if usar_cupom else texto_gerado_html
@@ -629,4 +621,16 @@ with col_btn1:
   ):
     if not enviar_telegram and not enviar_facebook:
       st.warning("Selecione ao menos um canal (Telegram ou Facebook).")
-    elif not 
+    elif not validacao_titulo and not link_final_envio:
+      st.warning("Preencha ao menos o Título e o Link da Oferta/Cupom.")
+    else:
+      st.info("Processando imagens e enviando...")
+
+      if enviar_facebook:
+        st_fb, msg_fb = postar_no_facebook(
+            FB_PAGE_ID_FIXO,
+            FB_PAGE_TOKEN_FIXO,
+            texto_final_html,
+            imagens_final_envio,
+            link_final_envio,
+       
