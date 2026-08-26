@@ -413,7 +413,7 @@ with tab_cupom:
   col_c1, col_c2 = st.columns(2)
   with col_c1:
     titulo_cupom = st.text_input(
-        "Título da Promocional / Loja",
+        "Título da Promoção / Loja",
         placeholder="Ex: CUPOM EXCLUSIVO FOREVER LISS NA SHOPEE!",
     )
     regras_cupom = st.text_input(
@@ -424,16 +424,41 @@ with tab_cupom:
         "Código do Cupom / Tipo",
         placeholder="Ex: Aplique o cupom da loja / CÓDIGO15",
     )
-
-  with col_c2:
     link_cupom = st.text_input(
         "Link do Cupom / Afiliado", placeholder="https://...", key="link_cupom"
     )
+
+  with col_c2:
+    st.markdown("### 🧮 Cálculo do Exemplo de Economia")
+
     carrinho_exemplo = st.text_input(
-        "Exemplo - Valor Carrinho (R$)", placeholder="Ex: 140"
+        "Exemplo - Valor Carrinho (R$)", value="130", placeholder="Ex: 130"
     )
+
+    porcentagem_cupom = st.text_input(
+        "Desconto em Porcentagem (%)", placeholder="Ex: 15"
+    )
+
+    # Cálculo Automático do Valor a Pagar
+    pagar_calculado = ""
+    if carrinho_exemplo:
+      try:
+        val_carrinho = float(
+            carrinho_exemplo.replace(".", "").replace(",", ".").strip()
+        )
+        if porcentagem_cupom:
+          val_pct = float(
+              porcentagem_cupom.replace("%", "").replace(",", ".").strip()
+          )
+          val_final = val_carrinho * (1 - val_pct / 100)
+          pagar_calculado = f"{val_final:.2f}".replace(".", ",")
+      except ValueError:
+        pass
+
     pagar_exemplo = st.text_input(
-        "Exemplo - Valor Final a Pagar (R$)", placeholder="Ex: 119"
+        "Exemplo - Valor Final a Pagar (R$)",
+        value=pagar_calculado,
+        placeholder="Ex: 110,50",
     )
 
   imagens_upload_cupom = st.file_uploader(
@@ -594,5 +619,4 @@ with col_btn2:
   texto_encoded = urllib.parse.quote(texto_final_wpp)
   link_whatsapp = f"https://api.whatsapp.com/send?text={texto_encoded}"
 
-  html_wpp = f'<a href="{link_whatsapp}" target="_blank" style="text-decoration: none;"><div style="background-color: #25D366; color: white; padding: 10px; text-align: center; border-radius: 8px; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 8px;">🟢 Compartilhar no WhatsApp</div></a>'
-  st.markdown(html_wpp, unsafe_allow_html=True)
+  html_
