@@ -1,4 +1,8 @@
 import os
+
+print(f"DEBUG URL: '{os.environ.get('SUPABASE_URL')}'")
+print(f"DEBUG KEY: '{os.environ.get('SUPABASE_KEY')}'")
+import os
 import json
 import time
 import io
