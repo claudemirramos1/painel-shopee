@@ -144,12 +144,47 @@ def processar_imagem(img_upload):
 # ==========================================
 # 3. FUNÇÕES DE DISPARO (FB & TG)
 # ==========================================
-def enviar_telegram_com_foto(texto, imagem_ref):
+def enviar_telegram_com_foto(texto, imagens_ref):
+    """Envia uma ou várias fotos como álbum (media group) para o Telegram"""
     try:
-        img_io = processar_imagem(imagem_ref)
-        if img_io:
+        if isinstance(imagens_ref, (str, io.BytesIO)):
+            imagens_ref = [imagens_ref]
+        elif not isinstance(imagens_ref, list):
+            imagens_ref = [imagens_ref]
+
+        midia_processada = []
+        files_dict = {}
+
+        for i, img_ref in enumerate(imagens_ref):
+            img_io = processar_imagem(img_ref)
+            if img_io:
+                file_key = f"photo_{i}"
+                files_dict[file_key] = ('foto.jpg', img_io.getvalue(), 'image/jpeg')
+                
+                item_midia = {
+                    "type": "photo",
+                    "media": f"attach://{file_key}"
+                }
+                if i == 0 and texto:
+                    item_midia["caption"] = texto
+                    item_midia["parse_mode"] = "Markdown"
+                
+                midia_processada.append(item_midia)
+
+        if len(midia_processada) > 1:
+            url = f"https://api.telegram.org/bot{TELEGRAM_CANAL_TOKEN}/sendMediaGroup"
+            data = {
+                'chat_id': TELEGRAM_CANAL_ID,
+                'media': json.dumps(midia_processada)
+            }
+            r = requests.post(url, data=data, files=files_dict, timeout=40)
+            res_json = r.json()
+            return res_json.get("ok", False), r.text
+
+        elif len(midia_processada) == 1:
             url = f"https://api.telegram.org/bot{TELEGRAM_CANAL_TOKEN}/sendPhoto"
-            files = {'photo': ('foto.jpg', img_io.getvalue(), 'image/jpeg')}
+            file_key = list(files_dict.keys())[0]
+            files = {'photo': files_dict[file_key]}
             data = {'chat_id': TELEGRAM_CANAL_ID, 'caption': texto, 'parse_mode': 'Markdown'}
             r = requests.post(url, data=data, files=files, timeout=30)
             res_json = r.json()
@@ -160,12 +195,16 @@ def enviar_telegram_com_foto(texto, imagem_ref):
             r = requests.post(url, data=data, timeout=15)
             res_json = r.json()
             return res_json.get("ok", False), r.text
+
     except Exception as e:
         return False, str(e)
 
 def enviar_facebook_com_foto(texto, link, imagem_ref):
     try:
-        img_io = processar_imagem(imagem_ref)
+        # Pega a primeira foto caso seja uma lista (o Facebook postará a principal)
+        img_alvo = imagem_ref[0] if isinstance(imagem_ref, list) and len(imagem_ref) > 0 else imagem_ref
+        
+        img_io = processar_imagem(img_alvo)
         legenda = texto.replace("**", "*")
         if link and link not in legenda:
             legenda += f"\n\n🔗 {link}"
@@ -280,7 +319,6 @@ with aba_fila:
                 if col_b1.button("📋 Carregar no Form Manual", key=f"load_{item['id']}"):
                     t_ext, p_ext, l_ext = extrair_dados_do_texto_bruto(item.get("formatado") or item.get("titulo") or "")
                     
-                    # Atualiza diretamente as chaves de estado do formulário manual
                     st.session_state.input_titulo = item.get("titulo") or t_ext
                     st.session_state.input_preco = item.get("preco") or p_ext
                     st.session_state.input_link = item.get("link") or l_ext
@@ -289,9 +327,8 @@ with aba_fila:
                     st.rerun()
 
                 if col_b2.button("🚀 Enviar Agora", key=f"send_{item['id']}"):
-                    # Usa a primeira foto como referência principal para o envio nas redes
-                    foto_principal = fotos_item_lista[0] if fotos_item_lista else None
-                    ok, log = disparar_redes_completo(texto_item, link_item, foto_principal, fila_fb, fila_tg)
+                    # Envia a LISTA COMPLETA de fotos para o Telegram (criando o álbum)
+                    ok, log = disparar_redes_completo(texto_item, link_item, fotos_item_lista, fila_fb, fila_tg)
                     if ok:
                         remover_rascunho(item["id"])
                         st.success("Publicado e removido da fila!")
@@ -340,17 +377,17 @@ with aba_auto:
             proxima = rascunhos[0] 
             texto_auto, link_auto = obter_texto_anuncio(proxima)
             fotos_auto_lista = obter_fotos_lista(proxima)
-            foto_prox = fotos_auto_lista[0] if fotos_auto_lista else None
 
             st.info(f"⏳ Processando oferta da fila...")
 
-            if not foto_prox:
+            if not fotos_auto_lista:
                 st.warning("⚠️ Oferta ignorada pelo piloto automático: Item sem foto na base. Removendo da fila...")
                 remover_rascunho(proxima["id"])
                 time.sleep(3)
                 st.rerun()
 
-            ok, log = disparar_redes_completo(texto_auto, link_auto, foto_prox, enviar_fb=True, enviar_tg=True)
+            # Envia a LISTA COMPLETA de fotos no piloto automático
+            ok, log = disparar_redes_completo(texto_auto, link_auto, fotos_auto_lista, enviar_fb=True, enviar_tg=True)
             if ok:
                 remover_rascunho(proxima["id"])
                 st.success(f"✅ Oferta publicada! Próximo disparo em {intervalo_minutos} minuto(s)...")
