@@ -194,7 +194,7 @@ while True:
             else:
                 print("❌ Erro ao disparar nas redes. Tentando novamente em 1 minuto...")
                 time.sleep(60)
-                continue
+                #continue
         else:
             print("⏳ Fila vazia. Verificando novamente em 30 segundos...")
         
