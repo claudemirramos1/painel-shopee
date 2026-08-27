@@ -1,8 +1,4 @@
 import os
-
-print(f"DEBUG URL: '{os.environ.get('SUPABASE_URL')}'")
-print(f"DEBUG KEY: '{os.environ.get('SUPABASE_KEY')}'")
-import os
 import json
 import time
 import io
@@ -12,11 +8,12 @@ from PIL import Image, ImageOps
 from supabase import create_client, Client
 
 # ==========================================
-# CONFIGURAÇÕES E CREDENCIAIS SEGURAS
+# CREDENCIAIS FIXAS (Garante 0 erros de leitura)
 # ==========================================
-SUPABASE_URL = (os.environ.get("SUPABASE_URL") or "").strip()
-SUPABASE_KEY = (os.environ.get("SUPABASE_KEY") or "").strip()
+SUPABASE_URL = "https://ftumdeqziwyljmaehaqk.supabase.co"
+SUPABASE_KEY = "sb_publishable_8qfsBhW22Sx25mvPcxWNvw_4teJRbfu"
 
+# Demais variáveis puxadas da Railway com segurança
 FACEBOOK_PAGE_ID = (os.environ.get("FACEBOOK_PAGE_ID") or "").strip()
 FACEBOOK_ACCESS_TOKEN = (os.environ.get("FACEBOOK_ACCESS_TOKEN") or "").strip()
 TELEGRAM_CANAL_TOKEN = (os.environ.get("TELEGRAM_CANAL_TOKEN") or "").strip()
@@ -26,14 +23,11 @@ INTERVALO_MINUTOS = int((os.environ.get("INTERVALO_MINUTOS") or "15").strip())
 
 print("🤖 Iniciando Worker de Piloto Automático...")
 
-# Inicialização segura do cliente Supabase para evitar crash completo
+# Inicialização do cliente Supabase
 supabase = None
 try:
-    if SUPABASE_URL and SUPABASE_KEY:
-        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-        print("✅ Conectado ao Supabase com sucesso!")
-    else:
-        print("❌ ATENÇÃO: As chaves do Supabase não foram encontradas nas variáveis de ambiente.")
+    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    print("✅ Conectado ao Supabase com sucesso!")
 except Exception as e:
     print(f"⚠️ Erro ao criar cliente Supabase: {e}")
 
@@ -165,7 +159,7 @@ def enviar_facebook(texto, link, imagem_url):
     except:
         return False
 
-# Loop principal seguro
+# Loop principal do robô
 while True:
     try:
         if not supabase:
@@ -194,7 +188,7 @@ while True:
             else:
                 print("❌ Erro ao disparar nas redes. Tentando novamente em 1 minuto...")
                 time.sleep(60)
-                #continue
+                continue
         else:
             print("⏳ Fila vazia. Verificando novamente em 30 segundos...")
         
@@ -202,4 +196,3 @@ while True:
     except Exception as e:
         print(f"⚠️ Erro no loop geral: {e}")
         time.sleep(30)
-        # Atualizado
