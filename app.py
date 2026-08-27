@@ -38,15 +38,21 @@ def remover_rascunho(rascunho_id):
     except Exception as e:
         st.error(f"Erro ao remover: {e}")
 
+def obter_foto_item(item):
+    """Verifica todos os possíveis nomes de colunas que o Supabase pode usar para a imagem"""
+    chaves_possiveis = ["imagem", "foto", "img", "url_imagem", "foto_url", "image_url", "media", "banner"]
+    for chave in chaves_possiveis:
+        if item.get(chave):
+            return item.get(chave)
+    return None
+
 def processar_imagem(img_upload):
     try:
         if isinstance(img_upload, str):
-            # Se for URL vinda da fila/Supabase
             resp = requests.get(img_upload, timeout=10)
             if resp.status_code != 200: return None
             img = Image.open(io.BytesIO(resp.content))
         else:
-            # Se for upload manual do Streamlit
             img_upload.seek(0)
             img = Image.open(io.BytesIO(img_upload.getvalue()))
 
@@ -63,7 +69,7 @@ def processar_imagem(img_upload):
         return None
 
 # ==========================================
-# 3. FUNÇÕES DE DISPARO COM FOTO (FB & TG)
+# 3. FUNÇÕES DE DISPARO (FB & TG)
 # ==========================================
 def enviar_telegram_com_foto(texto, imagem_ref):
     try:
@@ -87,7 +93,7 @@ def enviar_telegram_com_foto(texto, imagem_ref):
 def enviar_facebook_com_foto(texto, link, imagem_ref):
     try:
         img_io = processar_imagem(imagem_ref)
-        legenda = texto.replace("**", "*") # Ajuste de negrito para o FB
+        legenda = texto.replace("**", "*")
         if link:
             legenda += f"\n\n🔗 {link}"
 
@@ -109,11 +115,16 @@ def enviar_facebook_com_foto(texto, link, imagem_ref):
     except Exception as e:
         return False, str(e)
 
-def disparar_redes_completo(texto_formatado, link, imagem_ref):
-    ok_tg, err_tg = enviar_telegram_com_foto(texto_formatado, imagem_ref)
-    ok_fb, err_fb = enviar_facebook_com_foto(texto_formatado, link, imagem_ref)
+def disparar_redes_completo(texto_formatado, link, imagem_ref, enviar_fb=True, enviar_tg=True):
+    ok_tg, err_tg = True, "Não selecionado"
+    ok_fb, err_fb = True, "Não selecionado"
+
+    if enviar_tg:
+        ok_tg, err_tg = enviar_telegram_com_foto(texto_formatado, imagem_ref)
+    if enviar_fb:
+        ok_fb, err_fb = enviar_facebook_com_foto(texto_formatado, link, imagem_ref)
     
-    sucesso_geral = ok_tg and ok_fb
+    sucesso_geral = (ok_tg if enviar_tg else True) and (ok_fb if enviar_fb else True)
     logs = f"TG: {err_tg} | FB: {err_fb}"
     return sucesso_geral, logs
 
@@ -128,17 +139,26 @@ aba_manual, aba_fila, aba_auto = st.tabs([
     "🤖 Piloto Automático"
 ])
 
+# Inicializa session_state para os inputs manuais se não existirem
+if "val_titulo" not in st.session_state: st.session_state.val_titulo = ""
+if "val_preco" not in st.session_state: st.session_state.val_preco = ""
+if "val_link" not in st.session_state: st.session_state.val_link = ""
+
 # --- ABA 1: MANUAL ---
 with aba_manual:
     st.subheader("Postagem Manual para Redes Sociais")
-    
-    tit_def = st.session_state.get("tp", "")
-    prc_def = st.session_state.get("ppor", "")
-    lnk_def = st.session_state.get("lp", "")
 
-    titulo = st.text_input("Título do Produto", value=tit_def)
-    preco = st.text_input("Preço Promocional (R$)", value=prc_def)
-    link = st.text_input("Link de Afiliado", value=lnk_def)
+    col_m1, col_m2 = st.columns(2)
+    with col_m1:
+        titulo = st.text_input("Título do Produto", value=st.session_state.val_titulo, key="input_titulo")
+        preco = st.text_input("Preço Promocional (R$)", value=st.session_state.val_preco, key="input_preco")
+        link = st.text_input("Link de Afiliado", value=st.session_state.val_link, key="input_link")
+    
+    with col_m2:
+        st.markdown("**Canais de Envio:**")
+        manual_fb = st.checkbox("Publicar no Facebook", value=True, key="m_fb")
+        manual_tg = st.checkbox("Publicar no Telegram", value=True, key="m_tg")
+
     foto_manual = st.file_uploader("📸 Foto do Produto", type=["jpg", "png", "webp"])
 
     texto_preview = f"⚡ **OFERTA IMPERDÍVEL!**\n\n🔥 **{titulo}**\n\n✅ **Por:** R$ {preco}\n\n👇 **Garantia de menor preço no link abaixo**\n\n🔗 {link}"
@@ -146,14 +166,16 @@ with aba_manual:
     st.markdown("**Pré-visualização do Anúncio:**")
     st.info(texto_preview)
 
-    if st.button("🚀 Disparar Postagem Manual (FB + Telegram)", type="primary"):
+    if st.button("🚀 Disparar Postagem Manual", type="primary"):
         if not foto_manual:
             st.warning("⚠️ O envio manual exige uma foto anexada!")
+        elif not (manual_fb or manual_tg):
+            st.warning("⚠️ Selecione pelo menos uma rede social para enviar!")
         else:
-            with st.spinner("Enviando para o Telegram e Facebook..."):
-                ok, log = disparar_redes_completo(texto_preview, link, foto_manual)
+            with st.spinner("Enviando..."):
+                ok, log = disparar_redes_completo(texto_preview, link, foto_manual, manual_fb, manual_tg)
                 if ok:
-                    st.success("✅ Oferta postada com sucesso em ambas as redes!")
+                    st.success("✅ Oferta postada com sucesso!")
                 else:
                     st.error(f"❌ Erro no disparo: {log}")
 
@@ -166,9 +188,20 @@ with aba_fila:
         st.info("Nenhuma oferta pendente no momento.")
     else:
         st.write(f"Total na fila: **{len(rascunhos)}** oferta(s)")
+        
+        # Checkboxes globais para a fila
+        col_opt1, col_opt2 = st.columns(2)
+        fila_fb = col_opt1.checkbox("Enviar para Facebook na Fila", value=True, key="f_fb_global")
+        fila_tg = col_opt2.checkbox("Enviar para Telegram na Fila", value=True, key="f_tg_global")
+
         for item in rascunhos:
-            with st.expander(f"📦 {item.get('titulo') or 'Oferta sem Título'} - R$ {item.get('preco')}", expanded=False):
+            foto_item_url = obter_foto_item(item)
+            tem_foto_status = "🖼️ Com Foto" if foto_item_url else "⚠️ Sem Foto"
+            
+            with st.expander(f"📦 {item.get('titulo') or 'Oferta'} - R$ {item.get('preco')} | {tem_foto_status}", expanded=False):
                 st.markdown(f"**Link:** {item.get('link')}")
+                if foto_item_url:
+                    st.image(foto_item_url, width=150)
                 
                 t_item = item.get('titulo', '')
                 p_item = item.get('preco', '')
@@ -180,14 +213,14 @@ with aba_fila:
                 col_b1, col_b2, col_b3 = st.columns(3)
                 
                 if col_b1.button("📋 Carregar no Form Manual", key=f"load_{item['id']}"):
-                    st.session_state["tp"] = t_item
-                    st.session_state["ppor"] = p_item
-                    st.session_state["lp"] = l_item
-                    st.success("Dados copiados para a aba 'Postagem Manual'!")
+                    st.session_state.val_titulo = t_item
+                    st.session_state.val_preco = p_item
+                    st.session_state.val_link = l_item
+                    st.success("✅ Dados carregados na aba 'Postagem Manual'! Vá até lá.")
+                    st.rerun()
 
-                if col_b2.button("🚀 Enviar Agora (FB + TG)", key=f"send_{item['id']}"):
-                    foto_url = item.get("imagem") or item.get("foto") or item.get("img")
-                    ok, log = disparar_redes_completo(texto_padrao, l_item, foto_url)
+                if col_b2.button("🚀 Enviar Agora", key=f"send_{item['id']}"):
+                    ok, log = disparar_redes_completo(texto_padrao, l_item, foto_item_url, fila_fb, fila_tg)
                     if ok:
                         remover_rascunho(item["id"])
                         st.success("Publicado e removido da fila!")
@@ -237,7 +270,7 @@ with aba_auto:
             t_prox = proxima.get('titulo', '')
             p_prox = proxima.get('preco', '')
             l_prox = proxima.get('link', '')
-            foto_prox = proxima.get("imagem") or proxima.get("foto") or proxima.get("img")
+            foto_prox = obter_foto_item(proxima)
 
             texto_auto = f"⚡ **OFERTA IMPERDÍVEL!**\n\n🔥 **{t_prox}**\n\n✅ **Por:** R$ {p_prox}\n\n👇 **Garantia de menor preço no link abaixo**\n\n🔗 {l_prox}"
 
@@ -249,10 +282,10 @@ with aba_auto:
                 time.sleep(3)
                 st.rerun()
 
-            ok, log = disparar_redes_completo(texto_auto, l_prox, foto_prox)
+            ok, log = disparar_redes_completo(texto_auto, l_prox, foto_prox, enviar_fb=True, enviar_tg=True)
             if ok:
                 remover_rascunho(proxima["id"])
-                st.success(f"✅ Oferta publicada no Facebook e Telegram! Próximo disparo em {intervalo_minutos} minuto(s)...")
+                st.success(f"✅ Oferta publicada! Próximo disparo em {intervalo_minutos} minuto(s)...")
                 time.sleep(intervalo_minutos * 60)
                 st.rerun()
             else:
