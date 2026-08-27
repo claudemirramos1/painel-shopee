@@ -196,3 +196,4 @@ while True:
     except Exception as e:
         print(f"⚠️ Erro no loop geral: {e}")
         time.sleep(30)
+        #continue
