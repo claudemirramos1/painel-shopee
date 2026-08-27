@@ -39,17 +39,45 @@ def remover_rascunho(rascunho_id):
         st.error(f"Erro ao remover: {e}")
 
 def obter_foto_item(item):
-    """Verifica todos os possíveis nomes de colunas que o Supabase pode usar para a imagem"""
-    chaves_possiveis = ["imagem", "foto", "img", "url_imagem", "foto_url", "image_url", "media", "banner"]
-    for chave in chaves_possiveis:
-        if item.get(chave):
-            return item.get(chave)
+    """Extrai a URL da foto considerando a coluna 'fotos' (tipo jsonb ou texto)"""
+    val = item.get("fotos") or item.get("imagem") or item.get("foto") or item.get("img")
+    
+    if not val:
+        return None
+    
+    # Se vier em formato de lista (JSON do Supabase)
+    if isinstance(val, list) and len(val) > 0:
+        primeiro = val[0]
+        if isinstance(primeiro, str):
+            return primeiro
+        elif isinstance(primeiro, dict):
+            return primeiro.get("url") or primeiro.get("link") or primeiro.get("path")
+            
+    # Se vier em formato de dicionário
+    if isinstance(val, dict):
+        return val.get("url") or val.get("link") or val.get("path")
+        
+    # Se vier direto como texto (string contendo a URL)
+    if isinstance(val, str):
+        # Se for uma string JSON representando uma lista, tenta converter
+        if val.startswith("[") or val.startswith("{"):
+            try:
+                parsed = json.loads(val)
+                if isinstance(parsed, list) and len(parsed) > 0:
+                    if isinstance(parsed[0], str): return parsed[0]
+                    if isinstance(parsed[0], dict): return parsed[0].get("url") or parsed[0].get("link")
+                elif isinstance(parsed, dict):
+                    return parsed.get("url") or parsed.get("link")
+            except:
+                pass
+        return val
+        
     return None
 
 def processar_imagem(img_upload):
     try:
         if isinstance(img_upload, str):
-            resp = requests.get(img_upload, timeout=10)
+            resp = requests.get(img_upload, timeout=15)
             if resp.status_code != 200: return None
             img = Image.open(io.BytesIO(resp.content))
         else:
@@ -139,7 +167,6 @@ aba_manual, aba_fila, aba_auto = st.tabs([
     "🤖 Piloto Automático"
 ])
 
-# Inicializa session_state para os inputs manuais se não existirem
 if "val_titulo" not in st.session_state: st.session_state.val_titulo = ""
 if "val_preco" not in st.session_state: st.session_state.val_preco = ""
 if "val_link" not in st.session_state: st.session_state.val_link = ""
@@ -189,7 +216,6 @@ with aba_fila:
     else:
         st.write(f"Total na fila: **{len(rascunhos)}** oferta(s)")
         
-        # Checkboxes globais para a fila
         col_opt1, col_opt2 = st.columns(2)
         fila_fb = col_opt1.checkbox("Enviar para Facebook na Fila", value=True, key="f_fb_global")
         fila_tg = col_opt2.checkbox("Enviar para Telegram na Fila", value=True, key="f_tg_global")
