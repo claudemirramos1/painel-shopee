@@ -8,25 +8,31 @@ from PIL import Image, ImageOps
 from supabase import create_client, Client
 
 # ==========================================
-# CONFIGURAÇÕES E CREDENCIAIS (Puxa das Variáveis de Ambiente)
+# CONFIGURAÇÕES E CREDENCIAIS (Com limpeza de espaços)
 # ==========================================
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+SUPABASE_URL = (os.environ.get("SUPABASE_URL") or "").strip()
+SUPABASE_KEY = (os.environ.get("SUPABASE_KEY") or "").strip()
+
+FACEBOOK_PAGE_ID = (os.environ.get("FACEBOOK_PAGE_ID") or "").strip()
+FACEBOOK_ACCESS_TOKEN = (os.environ.get("FACEBOOK_ACCESS_TOKEN") or "").strip()
+TELEGRAM_CANAL_TOKEN = (os.environ.get("TELEGRAM_CANAL_TOKEN") or "").strip()
+TELEGRAM_CANAL_ID = (os.environ.get("TELEGRAM_CANAL_ID") or "").strip()
+
+INTERVALO_MINUTOS = int((os.environ.get("INTERVALO_MINUTOS") or "15").strip())
+
+# Validação inicial para o log não crashar sem avisar
+if not SUPABASE_URL or not SUPABASE_KEY:
+    print("❌ ERRO CRÍTICO: SUPABASE_URL ou SUPABASE_KEY não foram configurados corretamente na Railway!")
+    while True: time.sleep(60)
+
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-FACEBOOK_PAGE_ID = os.environ.get("FACEBOOK_PAGE_ID")
-FACEBOOK_ACCESS_TOKEN = os.environ.get("FACEBOOK_ACCESS_TOKEN")
-TELEGRAM_CANAL_TOKEN = os.environ.get("TELEGRAM_CANAL_TOKEN")
-TELEGRAM_CANAL_ID = os.environ.get("TELEGRAM_CANAL_ID")
-
-# Intervalo entre postagens automáticas em minutos (ex: 15 minutos)
-INTERVALO_MINUTOS = int(os.environ.get("INTERVALO_MINUTOS", "15"))
 
 def carregar_rascunhos():
     try:
         res = supabase.table("ofertas").select("*").order("created_at", desc=False).execute()
         return res.data
-    except Exception:
+    except Exception as e:
+        print(f"⚠️ Erro ao consultar Supabase: {e}")
         return []
 
 def remover_rascunho(rascunho_id):
@@ -100,6 +106,8 @@ def processar_imagem(img_url):
         return None
 
 def enviar_telegram(texto, imagens_ref):
+    if not TELEGRAM_CANAL_TOKEN or not TELEGRAM_CANAL_ID:
+        return False
     try:
         if isinstance(imagens_ref, str): imagens_ref = [imagens_ref]
         midia_processada = []
@@ -129,6 +137,8 @@ def enviar_telegram(texto, imagens_ref):
         return False
 
 def enviar_facebook(texto, link, imagem_url):
+    if not FACEBOOK_PAGE_ID or not FACEBOOK_ACCESS_TOKEN:
+        return False
     try:
         img_io = processar_imagem(imagem_url)
         legenda = texto.replace("**", "*")
