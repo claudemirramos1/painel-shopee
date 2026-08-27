@@ -1,65 +1,68 @@
+cat << 'EOF' > ~/painel-shopee/app.py
 import streamlit as st
+import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Painel Shopee", layout="wide")
 
 st.title("Painel Shopee")
 
-# Widget flutuante injetado via HTML/CSS/JS direto
-st.markdown("""
-<div id="painel-flutuante" style="position: fixed; bottom: 20px; right: 20px; z-index: 999999; width: 300px; background: #f8f9fa; border: 1px solid #ccc; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
-    <div id="painel-header" style="cursor: move; padding: 10px; background-color: #ee4d2d; color: white; border-radius: 7px 7px 0 0; font-weight: bold; user-select: none;">
-        Painel Flutuante 📱
-    </div>
-    <div style="padding: 12px;">
-        <p style="margin: 0; color: #333;">Arraste pelo cabeçalho para mover.</p>
-    </div>
+# Painel flutuante blindado dentro de um componente isolado
+components.html("""
+<style>
+  body { margin: 0; background: transparent; font-family: sans-serif; }
+  #widget {
+    position: fixed; bottom: 20px; right: 20px; width: 280px;
+    background: #f8f9fa; border: 1px solid #ccc; border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 99999;
+  }
+  #header {
+    cursor: move; background: #ee4d2d; color: white; padding: 10px;
+    font-weight: bold; border-radius: 7px 7px 0 0; user-select: none;
+  }
+  #content { padding: 12px; color: #333; }
+</style>
+
+<div id="widget">
+  <div id="header">Painel Shopee 📱 (Arraste aqui)</div>
+  <div id="content">
+    <p style="margin:0;">Painel flutuante ativo e funcional!</p>
+  </div>
 </div>
 
 <script>
-const box = document.getElementById("painel-flutuante");
-const header = document.getElementById("painel-header");
+  const w = document.getElementById("widget");
+  const h = document.getElementById("header");
+  let isDragging = false, startX, startY, initX, initY;
 
-let isDragging = false, startX, startY, initialLeft, initialTop;
+  h.addEventListener("mousedown", start);
+  h.addEventListener("touchstart", start, {passive: false});
+  document.addEventListener("mousemove", move);
+  document.addEventListener("touchmove", move, {passive: false});
+  document.addEventListener("mouseup", end);
+  document.addEventListener("touchend", end);
 
-header.addEventListener("mousedown", dragStart);
-header.addEventListener("touchstart", dragStart, {passive: false});
-
-document.addEventListener("mousemove", drag);
-document.addEventListener("touchmove", drag, {passive: false});
-
-document.addEventListener("mouseup", dragEnd);
-document.addEventListener("touchend", dragEnd);
-
-function dragStart(e) {
+  function start(e) {
     isDragging = true;
-    let clientX = e.type === "touchstart" ? e.touches[0].clientX : e.clientX;
-    let clientY = e.type === "touchstart" ? e.touches[0].clientY : e.clientY;
-    
-    let rect = box.getBoundingClientRect();
-    startX = clientX;
-    startY = clientY;
-    initialLeft = rect.left;
-    initialTop = rect.top;
-    
-    box.style.bottom = "auto";
-    box.style.right = "auto";
-    box.style.left = initialLeft + "px";
-    box.style.top = initialTop + "px";
+    let cX = e.touches ? e.touches[0].clientX : e.clientX;
+    let cY = e.touches ? e.touches[0].clientY : e.clientY;
+    let rect = w.getBoundingClientRect();
+    startX = cX; startY = cY;
+    initX = rect.left; initY = rect.top;
+    w.style.bottom = "auto"; w.style.right = "auto";
+    w.style.left = initX + "px"; w.style.top = initY + "px";
     e.preventDefault();
-}
+  }
 
-function drag(e) {
+  function move(e) {
     if (!isDragging) return;
-    let clientX = e.type === "touchmove" ? e.touches[0].clientX : e.clientX;
-    let clientY = e.type === "touchmove" ? e.touches[0].clientY : e.clientY;
-    
-    box.style.left = (initialLeft + (clientX - startX)) + "px";
-    box.style.top = (initialTop + (clientY - startY)) + "px";
+    let cX = e.touches ? e.touches[0].clientX : e.clientX;
+    let cY = e.touches ? e.touches[0].clientY : e.clientY;
+    w.style.left = (initX + (cX - startX)) + "px";
+    w.style.top = (initY + (cY - startY)) + "px";
     e.preventDefault();
-}
+  }
 
-function dragEnd() {
-    isDragging = false;
-}
+  function end() { isDragging = false; }
 </script>
-""", unsafe_allow_html=True)
+""", height=220)
+EOF
