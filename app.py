@@ -38,6 +38,22 @@ def remover_rascunho(rascunho_id):
     except Exception as e:
         st.error(f"Erro ao remover: {e}")
 
+def obter_texto_anuncio(item):
+    """Pega o texto formatado salvo pelo bot do WhatsApp ou monta se faltar"""
+    # Se a coluna 'formatado' já tem o texto pronto do bot, usa ele direto!
+    if item.get("formatado"):
+        return item.get("formatado")
+    
+    # Se não tiver, monta utilizando o padrão rigoroso com os dados disponíveis
+    t_item = item.get('titulo') or item.get('title') or "Oferta Imperdível"
+    p_item = item.get('preco') or item.get('price') or "Consulte"
+    l_item = item.get('link') or item.get('url') or ""
+    
+    return f"⚡ **OFERTA IMPERDÍVEL!**\n\n🔥 **{t_item}**\n\n✅ **Por:** R$ {p_item}\n\n👇 **Garantia de menor preço no link abaixo**\n\n🔗 {l_item}"
+
+def obter_link_afiliado(item):
+    return item.get('link') or item.get('url') or ""
+
 def obter_foto_item(item):
     """Extrai a URL da foto considerando a coluna 'fotos' (tipo jsonb ou texto)"""
     val = item.get("fotos") or item.get("imagem") or item.get("foto") or item.get("img")
@@ -45,7 +61,6 @@ def obter_foto_item(item):
     if not val:
         return None
     
-    # Se vier em formato de lista (JSON do Supabase)
     if isinstance(val, list) and len(val) > 0:
         primeiro = val[0]
         if isinstance(primeiro, str):
@@ -53,13 +68,10 @@ def obter_foto_item(item):
         elif isinstance(primeiro, dict):
             return primeiro.get("url") or primeiro.get("link") or primeiro.get("path")
             
-    # Se vier em formato de dicionário
     if isinstance(val, dict):
         return val.get("url") or val.get("link") or val.get("path")
         
-    # Se vier direto como texto (string contendo a URL)
     if isinstance(val, str):
-        # Se for uma string JSON representando uma lista, tenta converter
         if val.startswith("[") or val.startswith("{"):
             try:
                 parsed = json.loads(val)
@@ -122,7 +134,7 @@ def enviar_facebook_com_foto(texto, link, imagem_ref):
     try:
         img_io = processar_imagem(imagem_ref)
         legenda = texto.replace("**", "*")
-        if link:
+        if link and link not in legenda:
             legenda += f"\n\n🔗 {link}"
 
         if img_io:
@@ -222,31 +234,27 @@ with aba_fila:
 
         for item in rascunhos:
             foto_item_url = obter_foto_item(item)
+            texto_item = obter_texto_anuncio(item)
+            link_item = obter_link_afiliado(item)
             tem_foto_status = "🖼️ Com Foto" if foto_item_url else "⚠️ Sem Foto"
             
             with st.expander(f"📦 {item.get('titulo') or 'Oferta'} - R$ {item.get('preco')} | {tem_foto_status}", expanded=False):
-                st.markdown(f"**Link:** {item.get('link')}")
                 if foto_item_url:
                     st.image(foto_item_url, width=150)
                 
-                t_item = item.get('titulo', '')
-                p_item = item.get('preco', '')
-                l_item = item.get('link', '')
-                texto_padrao = f"⚡ **OFERTA IMPERDÍVEL!**\n\n🔥 **{t_item}**\n\n✅ **Por:** R$ {p_item}\n\n👇 **Garantia de menor preço no link abaixo**\n\n🔗 {l_item}"
-                
-                st.text_area("Texto Formatado:", value=texto_padrao, height=100, key=f"txt_{item['id']}")
+                st.text_area("Texto Formatado:", value=texto_item, height=120, key=f"txt_{item['id']}")
 
                 col_b1, col_b2, col_b3 = st.columns(3)
                 
                 if col_b1.button("📋 Carregar no Form Manual", key=f"load_{item['id']}"):
-                    st.session_state.val_titulo = t_item
-                    st.session_state.val_preco = p_item
-                    st.session_state.val_link = l_item
+                    st.session_state.val_titulo = item.get('titulo', '')
+                    st.session_state.val_preco = item.get('preco', '')
+                    st.session_state.val_link = link_item
                     st.success("✅ Dados carregados na aba 'Postagem Manual'! Vá até lá.")
                     st.rerun()
 
                 if col_b2.button("🚀 Enviar Agora", key=f"send_{item['id']}"):
-                    ok, log = disparar_redes_completo(texto_padrao, l_item, foto_item_url, fila_fb, fila_tg)
+                    ok, log = disparar_redes_completo(texto_item, link_item, foto_item_url, fila_fb, fila_tg)
                     if ok:
                         remover_rascunho(item["id"])
                         st.success("Publicado e removido da fila!")
@@ -293,14 +301,11 @@ with aba_auto:
             st.rerun()
         else:
             proxima = rascunhos[0] 
-            t_prox = proxima.get('titulo', '')
-            p_prox = proxima.get('preco', '')
-            l_prox = proxima.get('link', '')
+            texto_auto = obter_texto_anuncio(proxima)
+            link_auto = obter_link_afiliado(proxima)
             foto_prox = obter_foto_item(proxima)
 
-            texto_auto = f"⚡ **OFERTA IMPERDÍVEL!**\n\n🔥 **{t_prox}**\n\n✅ **Por:** R$ {p_prox}\n\n👇 **Garantia de menor preço no link abaixo**\n\n🔗 {l_prox}"
-
-            st.info(f"⏳ Processando oferta: **{t_prox}**")
+            st.info(f"⏳ Processando oferta da fila...")
 
             if not foto_prox:
                 st.warning("⚠️ Oferta ignorada pelo piloto automático: Item sem foto na base. Removendo da fila...")
@@ -308,7 +313,7 @@ with aba_auto:
                 time.sleep(3)
                 st.rerun()
 
-            ok, log = disparar_redes_completo(texto_auto, l_prox, foto_prox, enviar_fb=True, enviar_tg=True)
+            ok, log = disparar_redes_completo(texto_auto, link_auto, foto_prox, enviar_fb=True, enviar_tg=True)
             if ok:
                 remover_rascunho(proxima["id"])
                 st.success(f"✅ Oferta publicada! Próximo disparo em {intervalo_minutos} minuto(s)...")
