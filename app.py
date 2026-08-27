@@ -1,4 +1,3 @@
-cat << 'EOF' > ~/painel-shopee/app.py
 import os
 import json
 import time
@@ -77,7 +76,6 @@ def enviar_telegram_com_foto(texto, imagem_ref):
             res_json = r.json()
             return res_json.get("ok", False), r.text
         else:
-            # Fallback caso dê erro na imagem: envia só texto
             url = f"https://api.telegram.org/bot{TELEGRAM_CANAL_TOKEN}/sendMessage"
             data = {'chat_id': TELEGRAM_CANAL_ID, 'text': texto, 'parse_mode': 'Markdown'}
             r = requests.post(url, data=data, timeout=15)
@@ -112,7 +110,6 @@ def enviar_facebook_com_foto(texto, link, imagem_ref):
         return False, str(e)
 
 def disparar_redes_completo(texto_formatado, link, imagem_ref):
-    # Envio obrigatório para Telegram e Facebook juntos
     ok_tg, err_tg = enviar_telegram_com_foto(texto_formatado, imagem_ref)
     ok_fb, err_fb = enviar_facebook_com_foto(texto_formatado, link, imagem_ref)
     
@@ -173,7 +170,6 @@ with aba_fila:
             with st.expander(f"📦 {item.get('titulo') or 'Oferta sem Título'} - R$ {item.get('preco')}", expanded=False):
                 st.markdown(f"**Link:** {item.get('link')}")
                 
-                # Reconstrói o texto no padrão rigoroso solicitado
                 t_item = item.get('titulo', '')
                 p_item = item.get('preco', '')
                 l_item = item.get('link', '')
@@ -263,4 +259,3 @@ with aba_auto:
                 st.error(f"Erro na publicação automática: {log}. Tentando novamente em 30s...")
                 time.sleep(30)
                 st.rerun()
-EOF
