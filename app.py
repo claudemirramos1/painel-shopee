@@ -22,6 +22,11 @@ TELEGRAM_CANAL_ID = st.secrets.get("TELEGRAM_CANAL_ID", "-1004406728710")
 
 st.set_page_config(page_title="Gestão de Ofertas - FB & Telegram", page_icon="📢", layout="wide")
 
+# Inicialização segura do session_state para os inputs manuais
+if "input_titulo" not in st.session_state: st.session_state.input_titulo = ""
+if "input_preco" not in st.session_state: st.session_state.input_preco = "0,00"
+if "input_link" not in st.session_state: st.session_state.input_link = ""
+
 # ==========================================
 # 2. FUNÇÕES DE SUPABASE E PROCESSAMENTO INTELIGENTE
 # ==========================================
@@ -39,23 +44,20 @@ def remover_rascunho(rascunho_id):
         st.error(f"Erro ao remover: {e}")
 
 def extrair_dados_do_texto_bruto(texto_bruto):
-    """Lê o texto livre vindo do WhatsApp e extrai título, preço e link automaticamente"""
+    """Lê o texto livre vindo do Telegram e extrai título, preço e link automaticamente"""
     if not texto_bruto:
         return "Produto", "0,00", ""
     
     link = ""
-    # Procura por links do tipo shopee ou http
     match_link = re.search(r'(https?://\S+)', texto_bruto)
     if match_link:
         link = match_link.group(1)
 
     preco = "0,00"
-    # Procura por padrões de preço como R$79,99 ou R$ 79.99
     match_preco = re.search(r'R\$\s*([\d\.,]+)', texto_bruto, re.IGNORECASE)
     if match_preco:
         preco = match_preco.group(1)
 
-    # Tenta extrair o título limpando as frases comuns do bot
     titulo = texto_bruto
     titulo = re.sub(r'Dê uma olhada em\s*', '', titulo, flags=re.IGNORECASE)
     if match_preco:
@@ -72,12 +74,9 @@ def extrair_dados_do_texto_bruto(texto_bruto):
 
 def obter_texto_anuncio(item):
     """Gera o texto rigorosamente formatado no padrão desejado"""
-    # Se já tiver o campo formatado limpo, usa ele, senão extrai do bruto/colunas
     texto_base = item.get("formatado") or item.get("titulo") or ""
-    
     titulo, preco, link = extrair_dados_do_texto_bruto(texto_base)
     
-    # Se o item tiver colunas separadas no banco, prioriza elas se existirem
     if item.get("titulo") and "Dê uma olhada" not in item.get("titulo"):
         titulo = item.get("titulo")
     if item.get("preco"):
@@ -87,40 +86,38 @@ def obter_texto_anuncio(item):
 
     return f"⚡ **OFERTA IMPERDÍVEL!**\n\n🔥 **{titulo}**\n\n✅ **Por:** R$ {preco}\n\n👇 **Garantia de menor preço no link abaixo**\n\n🔗 {link}", link
 
-def obter_foto_item(item):
-    """Varre todas as possibilidades de onde a foto/jsonb pode estar salva no Supabase"""
+def obter_fotos_lista(item):
+    """Retorna uma lista limpa com todas as URLs de fotos disponíveis no item"""
     val = item.get("fotos") or item.get("imagem") or item.get("foto") or item.get("img")
-    
     if not val:
-        return None
+        return []
     
-    # Se vier em lista (formato jsonb do Supabase)
-    if isinstance(val, list) and len(val) > 0:
-        primeiro = val[0]
-        if isinstance(primeiro, str):
-            return primeiro
-        elif isinstance(primeiro, dict):
-            return primeiro.get("url") or primeiro.get("link") or primeiro.get("path") or primeiro.get("fileUrl")
-            
-    # Se vier em dicionário
-    if isinstance(val, dict):
-        return val.get("url") or val.get("link") or val.get("path") or val.get("fileUrl")
-        
-    # Se vier em texto (string)
-    if isinstance(val, str):
+    urls = []
+    if isinstance(val, list):
+        for primeiro in val:
+            if isinstance(primeiro, str):
+                urls.append(primeiro)
+            elif isinstance(primeiro, dict):
+                u = primeiro.get("url") or primeiro.get("link") or primeiro.get("path") or primeiro.get("fileUrl")
+                if u: urls.append(u)
+    elif isinstance(val, str):
         if val.startswith("[") or val.startswith("{"):
             try:
                 parsed = json.loads(val)
-                if isinstance(parsed, list) and len(parsed) > 0:
-                    if isinstance(parsed[0], str): return parsed[0]
-                    if isinstance(parsed[0], dict): return parsed[0].get("url") or parsed[0].get("link")
+                if isinstance(parsed, list):
+                    for p in parsed:
+                        if isinstance(p, str): urls.append(p)
+                        elif isinstance(p, dict):
+                            u = p.get("url") or p.get("link")
+                            if u: urls.append(u)
                 elif isinstance(parsed, dict):
-                    return parsed.get("url") or parsed.get("link")
+                    u = parsed.get("url") or parsed.get("link")
+                    if u: urls.append(u)
             except:
                 pass
-        return val
-        
-    return None
+        else:
+            urls.append(val)
+    return urls
 
 def processar_imagem(img_upload):
     try:
@@ -215,19 +212,15 @@ aba_manual, aba_fila, aba_auto = st.tabs([
     "🤖 Piloto Automático"
 ])
 
-if "val_titulo" not in st.session_state: st.session_state.val_titulo = ""
-if "val_preco" not in st.session_state: st.session_state.val_preco = ""
-if "val_link" not in st.session_state: st.session_state.val_link = ""
-
 # --- ABA 1: MANUAL ---
 with aba_manual:
     st.subheader("Postagem Manual para Redes Sociais")
 
     col_m1, col_m2 = st.columns(2)
     with col_m1:
-        titulo = st.text_input("Título do Produto", value=st.session_state.val_titulo, key="input_titulo")
-        preco = st.text_input("Preço Promocional (R$)", value=st.session_state.val_preco, key="input_preco")
-        link = st.text_input("Link de Afiliado", value=st.session_state.val_link, key="input_link")
+        titulo = st.text_input("Título do Produto", key="input_titulo")
+        preco = st.text_input("Preço Promocional (R$)", key="input_preco")
+        link = st.text_input("Link de Afiliado", key="input_link")
     
     with col_m2:
         st.markdown("**Canais de Envio:**")
@@ -269,13 +262,16 @@ with aba_fila:
         fila_tg = col_opt2.checkbox("Enviar para Telegram na Fila", value=True, key="f_tg_global")
 
         for item in rascunhos:
-            foto_item_url = obter_foto_item(item)
+            fotos_item_lista = obter_fotos_lista(item)
             texto_item, link_item = obter_texto_anuncio(item)
-            tem_foto_status = "🖼️ Com Foto" if foto_item_url else "⚠️ Sem Foto"
+            tem_foto_status = f"🖼️ {len(fotos_item_lista)} Foto(s)" if fotos_item_lista else "⚠️ Sem Foto"
             
             with st.expander(f"📦 {item.get('titulo') or 'Oferta'} | {tem_foto_status}", expanded=False):
-                if foto_item_url:
-                    st.image(foto_item_url, width=150)
+                if fotos_item_lista:
+                    cols_imgs = st.columns(min(len(fotos_item_lista), 4))
+                    for idx, img_url in enumerate(fotos_item_lista):
+                        with cols_imgs[idx % len(cols_imgs)]:
+                            st.image(img_url, width=120)
                 
                 st.text_area("Texto Formatado:", value=texto_item, height=130, key=f"txt_{item['id']}")
 
@@ -283,14 +279,19 @@ with aba_fila:
                 
                 if col_b1.button("📋 Carregar no Form Manual", key=f"load_{item['id']}"):
                     t_ext, p_ext, l_ext = extrair_dados_do_texto_bruto(item.get("formatado") or item.get("titulo") or "")
-                    st.session_state.val_titulo = t_ext
-                    st.session_state.val_preco = p_ext
-                    st.session_state.val_link = l_ext
+                    
+                    # Atualiza diretamente as chaves de estado do formulário manual
+                    st.session_state.input_titulo = item.get("titulo") or t_ext
+                    st.session_state.input_preco = item.get("preco") or p_ext
+                    st.session_state.input_link = item.get("link") or l_ext
+                    
                     st.success("✅ Dados carregados na aba 'Postagem Manual'! Vá até lá.")
                     st.rerun()
 
                 if col_b2.button("🚀 Enviar Agora", key=f"send_{item['id']}"):
-                    ok, log = disparar_redes_completo(texto_item, link_item, foto_item_url, fila_fb, fila_tg)
+                    # Usa a primeira foto como referência principal para o envio nas redes
+                    foto_principal = fotos_item_lista[0] if fotos_item_lista else None
+                    ok, log = disparar_redes_completo(texto_item, link_item, foto_principal, fila_fb, fila_tg)
                     if ok:
                         remover_rascunho(item["id"])
                         st.success("Publicado e removido da fila!")
@@ -338,7 +339,8 @@ with aba_auto:
         else:
             proxima = rascunhos[0] 
             texto_auto, link_auto = obter_texto_anuncio(proxima)
-            foto_prox = obter_foto_item(proxima)
+            fotos_auto_lista = obter_fotos_lista(proxima)
+            foto_prox = fotos_auto_lista[0] if fotos_auto_lista else None
 
             st.info(f"⏳ Processando oferta da fila...")
 
