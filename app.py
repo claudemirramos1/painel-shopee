@@ -22,7 +22,7 @@ TELEGRAM_CANAL_ID = st.secrets.get("TELEGRAM_CANAL_ID", "-1004406728710")
 
 st.set_page_config(page_title="Gestão de Ofertas - FB & Telegram", page_icon="📢", layout="wide")
 
-# Inicialização segura do session_state para os inputs manuais
+# Inicialização segura do session_state
 if "input_titulo" not in st.session_state: st.session_state.input_titulo = ""
 if "input_preco" not in st.session_state: st.session_state.input_preco = "0,00"
 if "input_link" not in st.session_state: st.session_state.input_link = ""
@@ -44,7 +44,6 @@ def remover_rascunho(rascunho_id):
         st.error(f"Erro ao remover: {e}")
 
 def extrair_dados_do_texto_bruto(texto_bruto):
-    """Lê o texto livre vindo do Telegram e extrai título, preço e link automaticamente"""
     if not texto_bruto:
         return "Produto", "0,00", ""
     
@@ -73,7 +72,6 @@ def extrair_dados_do_texto_bruto(texto_bruto):
     return titulo, preco, link
 
 def obter_texto_anuncio(item):
-    """Gera o texto rigorosamente formatado no padrão desejado"""
     texto_base = item.get("formatado") or item.get("titulo") or ""
     titulo, preco, link = extrair_dados_do_texto_bruto(texto_base)
     
@@ -87,7 +85,6 @@ def obter_texto_anuncio(item):
     return f"⚡ **OFERTA IMPERDÍVEL!**\n\n🔥 **{titulo}**\n\n✅ **Por:** R$ {preco}\n\n👇 **Garantia de menor preço no link abaixo**\n\n🔗 {link}", link
 
 def obter_fotos_lista(item):
-    """Retorna uma lista limpa com todas as URLs de fotos disponíveis no item"""
     val = item.get("fotos") or item.get("imagem") or item.get("foto") or item.get("img")
     if not val:
         return []
@@ -145,7 +142,6 @@ def processar_imagem(img_upload):
 # 3. FUNÇÕES DE DISPARO (FB & TG)
 # ==========================================
 def enviar_telegram_com_foto(texto, imagens_ref):
-    """Envia uma ou várias fotos como álbum (media group) para o Telegram"""
     try:
         if isinstance(imagens_ref, (str, io.BytesIO)):
             imagens_ref = [imagens_ref]
@@ -201,9 +197,7 @@ def enviar_telegram_com_foto(texto, imagens_ref):
 
 def enviar_facebook_com_foto(texto, link, imagem_ref):
     try:
-        # Pega a primeira foto caso seja uma lista (o Facebook postará a principal)
         img_alvo = imagem_ref[0] if isinstance(imagem_ref, list) and len(imagem_ref) > 0 else imagem_ref
-        
         img_io = processar_imagem(img_alvo)
         legenda = texto.replace("**", "*")
         if link and link not in legenda:
@@ -257,9 +251,9 @@ with aba_manual:
 
     col_m1, col_m2 = st.columns(2)
     with col_m1:
-        titulo = st.text_input("Título do Produto", key="input_titulo")
-        preco = st.text_input("Preço Promocional (R$)", key="input_preco")
-        link = st.text_input("Link de Afiliado", key="input_link")
+        titulo = st.text_input("Título do Produto", value=st.session_state.input_titulo)
+        preco = st.text_input("Preço Promocional (R$)", value=st.session_state.input_preco)
+        link = st.text_input("Link de Afiliado", value=st.session_state.input_link)
     
     with col_m2:
         st.markdown("**Canais de Envio:**")
@@ -286,14 +280,26 @@ with aba_manual:
                 else:
                     st.error(f"❌ Erro no disparo: {log}")
 
-# --- ABA 2: FILA DE RASCUNHOS ---
+# --- ABA 2: FILA DE RASCUNHOS (COM REFRESH AUTOMÁTICO E MANUAL) ---
 with aba_fila:
     st.subheader("Fila de Ofertas Capturadas pelo Bot")
-    rascunhos = carregar_rascunhos()
 
-    if not rascunhos:
-        st.info("Nenhuma oferta pendente no momento.")
-    else:
+    # Fragmento que atualiza sozinho a cada 10 segundos apenas nesta aba
+    @st.fragment(run_every=10)
+    def renderizar_fila_rascunhos():
+        col_btn1, col_info = st.columns([1, 3])
+        with col_btn1:
+            if st.button("🔄 Atualizar Fila"):
+                st.rerun()
+        with col_info:
+            st.caption("⚡ Esta aba se atualiza automaticamente a cada 10 segundos.")
+
+        rascunhos = carregar_rascunhos()
+
+        if not rascunhos:
+            st.info("Nenhuma oferta pendente no momento.")
+            return
+
         st.write(f"Total na fila: **{len(rascunhos)}** oferta(s)")
         
         col_opt1, col_opt2 = st.columns(2)
@@ -323,11 +329,11 @@ with aba_fila:
                     st.session_state.input_preco = item.get("preco") or p_ext
                     st.session_state.input_link = item.get("link") or l_ext
                     
-                    st.success("✅ Dados carregados na aba 'Postagem Manual'! Vá até lá.")
+                    st.success("✅ Dados carregados na aba 'Postagem Manual'!")
+                    time.sleep(0.3)
                     st.rerun()
 
                 if col_b2.button("🚀 Enviar Agora", key=f"send_{item['id']}"):
-                    # Envia a LISTA COMPLETA de fotos para o Telegram (criando o álbum)
                     ok, log = disparar_redes_completo(texto_item, link_item, fotos_item_lista, fila_fb, fila_tg)
                     if ok:
                         remover_rascunho(item["id"])
@@ -339,6 +345,9 @@ with aba_fila:
                 if col_b3.button("🗑️ Descartar", key=f"del_{item['id']}"):
                     remover_rascunho(item["id"])
                     st.rerun()
+
+    # Executa o fragmento na aba de rascunhos
+    renderizar_fila_rascunhos()
 
 # --- ABA 3: PILOTO AUTOMÁTICO ---
 with aba_auto:
@@ -386,7 +395,6 @@ with aba_auto:
                 time.sleep(3)
                 st.rerun()
 
-            # Envia a LISTA COMPLETA de fotos no piloto automático
             ok, log = disparar_redes_completo(texto_auto, link_auto, fotos_auto_lista, enviar_fb=True, enviar_tg=True)
             if ok:
                 remover_rascunho(proxima["id"])
