@@ -8,7 +8,7 @@ from PIL import Image, ImageOps
 from supabase import create_client, Client
 
 # ==========================================
-# CONFIGURAÇÕES E CREDENCIAIS (Com limpeza de espaços)
+# CONFIGURAÇÕES E CREDENCIAIS SEGURAS
 # ==========================================
 SUPABASE_URL = (os.environ.get("SUPABASE_URL") or "").strip()
 SUPABASE_KEY = (os.environ.get("SUPABASE_KEY") or "").strip()
@@ -20,22 +20,32 @@ TELEGRAM_CANAL_ID = (os.environ.get("TELEGRAM_CANAL_ID") or "").strip()
 
 INTERVALO_MINUTOS = int((os.environ.get("INTERVALO_MINUTOS") or "15").strip())
 
-# Validação inicial para o log não crashar sem avisar
-if not SUPABASE_URL or not SUPABASE_KEY:
-    print("❌ ERRO CRÍTICO: SUPABASE_URL ou SUPABASE_KEY não foram configurados corretamente na Railway!")
-    while True: time.sleep(60)
+print("🤖 Iniciando Worker de Piloto Automático...")
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+# Inicialização segura do cliente Supabase para evitar crash completo
+supabase = None
+try:
+    if SUPABASE_URL and SUPABASE_KEY:
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+        print("✅ Conectado ao Supabase com sucesso!")
+    else:
+        print("❌ ATENÇÃO: As chaves do Supabase não foram encontradas nas variáveis de ambiente.")
+except Exception as e:
+    print(f"⚠️ Erro ao criar cliente Supabase: {e}")
 
 def carregar_rascunhos():
+    if not supabase:
+        return []
     try:
         res = supabase.table("ofertas").select("*").order("created_at", desc=False).execute()
         return res.data
     except Exception as e:
-        print(f"⚠️ Erro ao consultar Supabase: {e}")
+        print(f"⚠️ Erro ao buscar rascunhos: {e}")
         return []
 
 def remover_rascunho(rascunho_id):
+    if not supabase:
+        return
     try:
         supabase.table("ofertas").delete().eq("id", rascunho_id).execute()
     except Exception as e:
@@ -151,9 +161,14 @@ def enviar_facebook(texto, link, imagem_url):
     except:
         return False
 
-print("🤖 Worker de Piloto Automático Iniciado com Sucesso!")
+# Loop principal seguro
 while True:
     try:
+        if not supabase:
+            print("⏳ Aguardando conexão válida com o Supabase...")
+            time.sleep(15)
+            continue
+
         rascunhos = carregar_rascunhos()
         if rascunhos:
             proxima = rascunhos[0]
@@ -181,5 +196,5 @@ while True:
         
         time.sleep(INTERVALO_MINUTOS * 60)
     except Exception as e:
-        print(f"⚠️ Erro no loop: {e}")
+        print(f"⚠️ Erro no loop geral: {e}")
         time.sleep(30)
