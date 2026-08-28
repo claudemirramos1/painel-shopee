@@ -13,7 +13,7 @@ from supabase import create_client, Client
 SUPABASE_URL = "https://ftumdeqziwyljmaehaqk.supabase.co"
 SUPABASE_KEY = "sb_publishable_8qfsBhW22Sx25mvPcxWNvw_4teJRbfu"
 
-# Demais variáveis puxadas da Railway com segurança
+# Demais variáveis puxadas com segurança
 FACEBOOK_PAGE_ID = (os.environ.get("FACEBOOK_PAGE_ID") or "").strip()
 FACEBOOK_ACCESS_TOKEN = (os.environ.get("FACEBOOK_ACCESS_TOKEN") or "").strip()
 TELEGRAM_CANAL_TOKEN = (os.environ.get("TELEGRAM_CANAL_TOKEN") or "").strip()
@@ -21,9 +21,8 @@ TELEGRAM_CANAL_ID = (os.environ.get("TELEGRAM_CANAL_ID") or "").strip()
 
 INTERVALO_MINUTOS = int((os.environ.get("INTERVALO_MINUTOS") or "15").strip())
 
-print("🤖 Iniciando Worker de Piloto Automático...")
+print("🤖 Iniciando Worker Inteligente (Com e Sem Foto)...")
 
-# Inicialização do cliente Supabase
 supabase = None
 try:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -69,7 +68,12 @@ def extrair_dados_do_texto_bruto(texto_bruto):
     return titulo if titulo else "Oferta Imperdível", preco, link
 
 def obter_texto_anuncio(item):
-    texto_base = item.get("formatado") or item.get("titulo") or ""
+    # Se for texto de divulgação formatado, usa direto
+    if item.get("formatado"):
+        link = item.get("link") or ""
+        return item.get("formatado"), link
+        
+    texto_base = item.get("titulo") or ""
     titulo, preco, link = extrair_dados_do_texto_bruto(texto_base)
     if item.get("titulo") and "Dê uma olhada" not in item.get("titulo"): titulo = item.get("titulo")
     if item.get("preco"): preco = item.get("preco")
@@ -117,6 +121,14 @@ def enviar_telegram(texto, imagens_ref):
     if not TELEGRAM_CANAL_TOKEN or not TELEGRAM_CANAL_ID:
         return False
     try:
+        # Se NÃO houver imagem (Post de Divulgação), envia apenas mensagem de texto
+        if not imagens_ref:
+            url = f"https://api.telegram.org/bot{TELEGRAM_CANAL_TOKEN}/sendMessage"
+            payload = {'chat_id': TELEGRAM_CANAL_ID, 'text': texto, 'parse_mode': 'Markdown'}
+            r = requests.post(url, data=payload, timeout=30)
+            return r.json().get("ok", False)
+
+        # Se TIVER imagem (Oferta Normal)
         if isinstance(imagens_ref, str): imagens_ref = [imagens_ref]
         midia_processada = []
         files_dict = {}
@@ -141,22 +153,32 @@ def enviar_telegram(texto, imagens_ref):
             r = requests.post(url, data={'chat_id': TELEGRAM_CANAL_ID, 'caption': texto, 'parse_mode': 'Markdown'}, files={'photo': files_dict['photo_0']}, timeout=30)
             return r.json().get("ok", False)
         return False
-    except:
+    except Exception as e:
+        print(f"⚠️ Erro no Telegram: {e}")
         return False
 
-def enviar_facebook(texto, link, imagem_url):
+def enviar_facebook(texto, link, imagem_url=None):
     if not FACEBOOK_PAGE_ID or not FACEBOOK_ACCESS_TOKEN:
         return False
     try:
-        img_io = processar_imagem(imagem_url)
         legenda = texto.replace("**", "*")
-        if link and link not in legenda: legenda += f"\n\n🔗 {link}"
-        if img_io:
-            url = f"https://graph.facebook.com/v19.0/{FACEBOOK_PAGE_ID}/photos"
-            r = requests.post(url, data={'caption': legenda, 'access_token': FACEBOOK_ACCESS_TOKEN}, files={'source': ('foto.jpg', img_io.getvalue(), 'image/jpeg')}, timeout=40)
-            return "id" in r.json() or "post_id" in r.json()
-        return False
-    except:
+        
+        # Se tiver imagem, envia para /photos com a foto anexada
+        if imagem_url:
+            img_io = processar_imagem(imagem_url)
+            if img_io:
+                if link and link not in legenda: legenda += f"\n\n🔗 {link}"
+                url = f"https://graph.facebook.com/v19.0/{FACEBOOK_PAGE_ID}/photos"
+                r = requests.post(url, data={'caption': legenda, 'access_token': FACEBOOK_ACCESS_TOKEN}, files={'source': ('foto.jpg', img_io.getvalue(), 'image/jpeg')}, timeout=40)
+                return "id" in r.json() or "post_id" in r.json()
+        
+        # Se NÃO tiver imagem (Post de Divulgação), envia no /feed só texto e prévia do link
+        url = f"https://graph.facebook.com/v19.0/{FACEBOOK_PAGE_ID}/feed"
+        payload = {'message': legenda, 'link': link, 'access_token': FACEBOOK_ACCESS_TOKEN}
+        r = requests.post(url, data=payload, timeout=30)
+        return "id" in r.json()
+    except Exception as e:
+        print(f"⚠️ Erro no Facebook: {e}")
         return False
 
 # Loop principal do robô
@@ -172,15 +194,11 @@ while True:
             proxima = rascunhos[0]
             texto, link = obter_texto_anuncio(proxima)
             fotos = obter_fotos_lista(proxima)
+            foto_principal = fotos[0] if fotos else None
 
-            if not fotos:
-                print(f"⚠️ Oferta {proxima.get('id')} sem fotos. Removendo da fila.")
-                remover_rascunho(proxima["id"])
-                continue
-
-            print(f"🚀 Publicando oferta: {proxima.get('titulo')}")
+            print(f"🚀 Publicando: {proxima.get('titulo')} (Fotos encontradas: {len(fotos)})")
             ok_tg = enviar_telegram(texto, fotos)
-            ok_fb = enviar_facebook(texto, link, fotos[0])
+            ok_fb = enviar_facebook(texto, link, foto_principal)
 
             if ok_tg or ok_fb:
                 remover_rascunho(proxima["id"])
@@ -191,9 +209,10 @@ while True:
                 continue
         else:
             print("⏳ Fila vazia. Verificando novamente em 30 segundos...")
+            time.sleep(30)
+            continue
         
         time.sleep(INTERVALO_MINUTOS * 60)
     except Exception as e:
         print(f"⚠️ Erro no loop geral: {e}")
         time.sleep(30)
-        #continue
