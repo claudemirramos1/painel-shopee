@@ -72,7 +72,11 @@ def extrair_dados_do_texto_bruto(texto_bruto):
     return titulo, preco, link
 
 def obter_texto_anuncio(item):
-    texto_base = item.get("formatado") or item.get("titulo") or ""
+    if item.get("formatado"):
+        link = item.get("link") or ""
+        return item.get("formatado"), link
+
+    texto_base = item.get("titulo") or ""
     titulo, preco, link = extrair_dados_do_texto_bruto(texto_base)
     
     if item.get("titulo") and "Dê uma olhada" not in item.get("titulo"):
@@ -143,6 +147,13 @@ def processar_imagem(img_upload):
 # ==========================================
 def enviar_telegram_com_foto(texto, imagens_ref):
     try:
+        if not imagens_ref:
+            url = f"https://api.telegram.org/bot{TELEGRAM_CANAL_TOKEN}/sendMessage"
+            data = {'chat_id': TELEGRAM_CANAL_ID, 'text': texto, 'parse_mode': 'Markdown'}
+            r = requests.post(url, data=data, timeout=15)
+            res_json = r.json()
+            return res_json.get("ok", False), r.text
+
         if isinstance(imagens_ref, (str, io.BytesIO)):
             imagens_ref = [imagens_ref]
         elif not isinstance(imagens_ref, list):
@@ -197,13 +208,18 @@ def enviar_telegram_com_foto(texto, imagens_ref):
 
 def enviar_facebook_com_foto(texto, link, imagem_ref):
     try:
-        img_alvo = imagem_ref[0] if isinstance(imagem_ref, list) and len(imagem_ref) > 0 else imagem_ref
-        img_io = processar_imagem(img_alvo)
+        img_alvo = None
+        if isinstance(imagem_ref, list) and len(imagem_ref) > 0:
+            img_alvo = imagem_ref[0]
+        elif imagem_ref:
+            img_alvo = imagem_ref
+
+        img_io = processar_imagem(img_alvo) if img_alvo else None
         legenda = texto.replace("**", "*")
-        if link and link not in legenda:
-            legenda += f"\n\n🔗 {link}"
 
         if img_io:
+            if link and link not in legenda:
+                legenda += f"\n\n🔗 {link}"
             url = f"https://graph.facebook.com/v19.0/{FACEBOOK_PAGE_ID}/photos"
             files = {'source': ('foto.jpg', img_io.getvalue(), 'image/jpeg')}
             data = {'caption': legenda, 'access_token': FACEBOOK_ACCESS_TOKEN}
@@ -260,148 +276,4 @@ with aba_manual:
         manual_fb = st.checkbox("Publicar no Facebook", value=True, key="m_fb")
         manual_tg = st.checkbox("Publicar no Telegram", value=True, key="m_tg")
 
-    foto_manual = st.file_uploader("📸 Foto do Produto", type=["jpg", "png", "webp"])
-
-    texto_preview = f"⚡ **OFERTA IMPERDÍVEL!**\n\n🔥 **{titulo}**\n\n✅ **Por:** R$ {preco}\n\n👇 **Garantia de menor preço no link abaixo**\n\n🔗 {link}"
-    
-    st.markdown("**Pré-visualização do Anúncio:**")
-    st.info(texto_preview)
-
-    if st.button("🚀 Disparar Postagem Manual", type="primary"):
-        if not foto_manual:
-            st.warning("⚠️ O envio manual exige uma foto anexada!")
-        elif not (manual_fb or manual_tg):
-            st.warning("⚠️ Selecione pelo menos uma rede social para enviar!")
-        else:
-            with st.spinner("Enviando..."):
-                ok, log = disparar_redes_completo(texto_preview, link, foto_manual, manual_fb, manual_tg)
-                if ok:
-                    st.success("✅ Oferta postada com sucesso!")
-                else:
-                    st.error(f"❌ Erro no disparo: {log}")
-
-# --- ABA 2: FILA DE RASCUNHOS (COM REFRESH AUTOMÁTICO E MANUAL) ---
-with aba_fila:
-    st.subheader("Fila de Ofertas Capturadas pelo Bot")
-
-    # Fragmento que atualiza sozinho a cada 10 segundos apenas nesta aba
-    @st.fragment(run_every=10)
-    def renderizar_fila_rascunhos():
-        col_btn1, col_info = st.columns([1, 3])
-        with col_btn1:
-            if st.button("🔄 Atualizar Fila"):
-                st.rerun()
-        with col_info:
-            st.caption("⚡ Esta aba se atualiza automaticamente a cada 10 segundos.")
-
-        rascunhos = carregar_rascunhos()
-
-        if not rascunhos:
-            st.info("Nenhuma oferta pendente no momento.")
-            return
-
-        st.write(f"Total na fila: **{len(rascunhos)}** oferta(s)")
-        
-        col_opt1, col_opt2 = st.columns(2)
-        fila_fb = col_opt1.checkbox("Enviar para Facebook na Fila", value=True, key="f_fb_global")
-        fila_tg = col_opt2.checkbox("Enviar para Telegram na Fila", value=True, key="f_tg_global")
-
-        for item in rascunhos:
-            fotos_item_lista = obter_fotos_lista(item)
-            texto_item, link_item = obter_texto_anuncio(item)
-            tem_foto_status = f"🖼️ {len(fotos_item_lista)} Foto(s)" if fotos_item_lista else "⚠️ Sem Foto"
-            
-            with st.expander(f"📦 {item.get('titulo') or 'Oferta'} | {tem_foto_status}", expanded=False):
-                if fotos_item_lista:
-                    cols_imgs = st.columns(min(len(fotos_item_lista), 4))
-                    for idx, img_url in enumerate(fotos_item_lista):
-                        with cols_imgs[idx % len(cols_imgs)]:
-                            st.image(img_url, width=120)
-                
-                st.text_area("Texto Formatado:", value=texto_item, height=130, key=f"txt_{item['id']}")
-
-                col_b1, col_b2, col_b3 = st.columns(3)
-                
-                if col_b1.button("📋 Carregar no Form Manual", key=f"load_{item['id']}"):
-                    t_ext, p_ext, l_ext = extrair_dados_do_texto_bruto(item.get("formatado") or item.get("titulo") or "")
-                    
-                    st.session_state.input_titulo = item.get("titulo") or t_ext
-                    st.session_state.input_preco = item.get("preco") or p_ext
-                    st.session_state.input_link = item.get("link") or l_ext
-                    
-                    st.success("✅ Dados carregados na aba 'Postagem Manual'!")
-                    time.sleep(0.3)
-                    st.rerun()
-
-                if col_b2.button("🚀 Enviar Agora", key=f"send_{item['id']}"):
-                    ok, log = disparar_redes_completo(texto_item, link_item, fotos_item_lista, fila_fb, fila_tg)
-                    if ok:
-                        remover_rascunho(item["id"])
-                        st.success("Publicado e removido da fila!")
-                        st.rerun()
-                    else:
-                        st.error(f"Erro: {log}")
-
-                if col_b3.button("🗑️ Descartar", key=f"del_{item['id']}"):
-                    remover_rascunho(item["id"])
-                    st.rerun()
-
-    # Executa o fragmento na aba de rascunhos
-    renderizar_fila_rascunhos()
-
-# --- ABA 3: PILOTO AUTOMÁTICO ---
-with aba_auto:
-    st.subheader("⚙️ Configuração do Disparo Automático em Fila")
-
-    if "auto_rodando" not in st.session_state:
-        st.session_state.auto_rodando = False
-
-    intervalo_minutos = st.number_input(
-        "Intervalo entre postagens (em minutos):", 
-        min_value=1, 
-        max_value=180, 
-        value=15
-    )
-
-    col_p1, col_p2 = st.columns(2)
-    if col_p1.button("▶️ Ligar Piloto Automático", type="primary"):
-        st.session_state.auto_rodando = True
-
-    if col_p2.button("⏸️ Pausar Piloto Automático"):
-        st.session_state.auto_rodando = False
-
-    if st.session_state.auto_rodando:
-        st.success(f"🟢 **PILOTO AUTOMÁTICO ATIVO** — Intervalo: {intervalo_minutos} min.")
-    else:
-        st.warning("🔴 **PILOTO AUTOMÁTICO PAUSADO**")
-
-    if st.session_state.auto_rodando:
-        rascunhos = carregar_rascunhos()
-        
-        if not rascunhos:
-            st.info("Aguardando novas ofertas entrarem na fila...")
-            time.sleep(10)
-            st.rerun()
-        else:
-            proxima = rascunhos[0] 
-            texto_auto, link_auto = obter_texto_anuncio(proxima)
-            fotos_auto_lista = obter_fotos_lista(proxima)
-
-            st.info(f"⏳ Processando oferta da fila...")
-
-            if not fotos_auto_lista:
-                st.warning("⚠️ Oferta ignorada pelo piloto automático: Item sem foto na base. Removendo da fila...")
-                remover_rascunho(proxima["id"])
-                time.sleep(3)
-                st.rerun()
-
-            ok, log = disparar_redes_completo(texto_auto, link_auto, fotos_auto_lista, enviar_fb=True, enviar_tg=True)
-            if ok:
-                remover_rascunho(proxima["id"])
-                st.success(f"✅ Oferta publicada! Próximo disparo em {intervalo_minutos} minuto(s)...")
-                time.sleep(intervalo_minutos * 60)
-                st.rerun()
-            else:
-                st.error(f"Erro na publicação automática: {log}. Tentando novamente em 30s...")
-                time.sleep(30)
-                st.rerun()
+    foto_manual = st.file_uploader("📸 Foto do Produto (Opcional)", type=
