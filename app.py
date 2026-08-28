@@ -33,8 +33,9 @@ if "input_link" not in st.session_state: st.session_state.input_link = ""
 def carregar_rascunhos():
     try:
         res = supabase.table("ofertas").select("*").order("created_at", desc=False).execute()
-        return res.data
-    except Exception:
+        return res.data if res.data else []
+    except Exception as e:
+        st.error(f"Erro ao buscar ofertas no Supabase: {e}")
         return []
 
 def remover_rascunho(rascunho_id):
@@ -72,14 +73,10 @@ def extrair_dados_do_texto_bruto(texto_bruto):
     return titulo, preco, link
 
 def obter_texto_anuncio(item):
-    if item.get("formatado"):
-        link = item.get("link") or ""
-        return item.get("formatado"), link
-
-    texto_base = item.get("titulo") or ""
+    texto_base = item.get("formatado") or item.get("titulo") or item.get("descricao") or ""
     titulo, preco, link = extrair_dados_do_texto_bruto(texto_base)
     
-    if item.get("titulo") and "Dê uma olhada" not in item.get("titulo"):
+    if item.get("titulo") and "Dê uma olhada" not in str(item.get("titulo")):
         titulo = item.get("titulo")
     if item.get("preco"):
         preco = item.get("preco")
@@ -89,7 +86,7 @@ def obter_texto_anuncio(item):
     return f"⚡ **OFERTA IMPERDÍVEL!**\n\n🔥 **{titulo}**\n\n✅ **Por:** R$ {preco}\n\n👇 **Garantia de menor preço no link abaixo**\n\n🔗 {link}", link
 
 def obter_fotos_lista(item):
-    val = item.get("fotos") or item.get("imagem") or item.get("foto") or item.get("img")
+    val = item.get("fotos") or item.get("imagem") or item.get("foto") or item.get("img") or item.get("image")
     if not val:
         return []
     
@@ -115,7 +112,7 @@ def obter_fotos_lista(item):
                     u = parsed.get("url") or parsed.get("link")
                     if u: urls.append(u)
             except:
-                pass
+                urls.append(val)
         else:
             urls.append(val)
     return urls
@@ -324,26 +321,27 @@ with aba_fila:
             texto_item, link_item = obter_texto_anuncio(item)
             tem_foto_status = f"🖼️ {len(fotos_item_lista)} Foto(s)" if fotos_item_lista else "📝 Somente Texto"
             
-            with st.expander(f"📦 {item.get('titulo') or 'Oferta / Divulgação'} | {tem_foto_status}", expanded=False):
+            titulo_card = item.get('titulo') or item.get('formatado') or 'Oferta Sem Título'
+            if len(titulo_card) > 50:
+                titulo_card = titulo_card[:50] + "..."
+
+            with st.expander(f"📦 {titulo_card} | {tem_foto_status}", expanded=False):
                 if fotos_item_lista:
                     cols_imgs = st.columns(min(len(fotos_item_lista), 4))
                     for idx, img_url in enumerate(fotos_item_lista):
                         with cols_imgs[idx % len(cols_imgs)]:
-                            if isinstance(img_url, str) and img_url.startswith("http"):
-                                try:
-                                    st.image(img_url, width=120)
-                                except Exception:
-                                    st.caption("🖼️ Imagem indisponível")
-                            else:
-                                st.caption("🖼️ Imagem indisponível")
+                            try:
+                                st.image(img_url, width=120)
+                            except Exception:
+                                st.caption("🖼️ Erro ao carregar imagem")
                 else:
-                    st.caption("📝 Post de Texto / Convite VIP (Sem Foto)")
+                    st.caption("📝 Post sem Imagem / Apenas Texto")
 
-                st.text_area("Texto Formatado:", value=texto_item, height=130, key=f"txt_{item['id']}")
+                st.text_area("Texto Formatado:", value=texto_item, height=130, key=f"txt_{item.get('id')}")
 
                 col_b1, col_b2, col_b3 = st.columns(3)
                 
-                if col_b1.button("📋 Carregar no Form Manual", key=f"load_{item['id']}"):
+                if col_b1.button("📋 Carregar no Form Manual", key=f"load_{item.get('id')}"):
                     t_ext, p_ext, l_ext = extrair_dados_do_texto_bruto(item.get("formatado") or item.get("titulo") or "")
                     
                     st.session_state.input_titulo = item.get("titulo") or t_ext
@@ -354,17 +352,17 @@ with aba_fila:
                     time.sleep(0.3)
                     st.rerun()
 
-                if col_b2.button("🚀 Enviar Agora", key=f"send_{item['id']}"):
+                if col_b2.button("🚀 Enviar Agora", key=f"send_{item.get('id')}"):
                     ok, log = disparar_redes_completo(texto_item, link_item, fotos_item_lista, fila_fb, fila_tg)
                     if ok:
-                        remover_rascunho(item["id"])
+                        remover_rascunho(item.get("id"))
                         st.success("Publicado e removido da fila!")
                         st.rerun()
                     else:
                         st.error(f"Erro: {log}")
 
-                if col_b3.button("🗑️ Descartar", key=f"del_{item['id']}"):
-                    remover_rascunho(item["id"])
+                if col_b3.button("🗑️ Descartar", key=f"del_{item.get('id')}"):
+                    remover_rascunho(item.get("id"))
                     st.rerun()
 
     renderizar_fila_rascunhos()
@@ -411,11 +409,11 @@ with aba_auto:
 
             ok, log = disparar_redes_completo(texto_auto, link_auto, fotos_auto_lista, enviar_fb=True, enviar_tg=True)
             if ok:
-                remover_rascunho(proxima["id"])
+                remover_rascunho(proxima.get("id"))
                 st.success(f"✅ Oferta publicada! Próximo disparo em {intervalo_minutos} minuto(s)...")
                 time.sleep(intervalo_minutos * 60)
                 st.rerun()
             else:
                 st.error(f"Erro na publicação automática: {log}. Tentando novamente em 30s...")
                 time.sleep(30)
-                st.rerun()
+                st.rerun()  
