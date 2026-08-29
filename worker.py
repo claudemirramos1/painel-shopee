@@ -19,6 +19,7 @@ TELEGRAM_CANAL_TOKEN = "8353706833:AAHhyPqgeNezFY1X4NTMegpaPf_UdVOBs04"
 TELEGRAM_CANAL_ID = "-1004406728710"
 
 INTERVALO_MINUTOS = int((os.environ.get("INTERVALO_MINUTOS") or "15").strip())
+INTERVALO_DIVULGACAO_MINUTOS = 120
 
 print("🤖 Iniciando Worker Inteligente (Com e Sem Foto)...")
 
@@ -393,9 +394,9 @@ while True:
             if ok_divulgacao:
                 print(
                     f"✅ Divulgação enviada. "
-                    f"Aguardando {INTERVALO_MINUTOS} min para o próximo ciclo..."
+                    f"Aguardando {INTERVALO_DIVULGACAO_MINUTOS} min para o próximo ciclo..."
                 )
-                time.sleep(INTERVALO_MINUTOS * 60)
+                time.sleep(INTERVALO_DIVULGACAO_MINUTOS * 60)
             else:
                 print("⚠️ Nenhuma divulgação enviada. Tentando novamente em 30 segundos...")
                 time.sleep(30)
