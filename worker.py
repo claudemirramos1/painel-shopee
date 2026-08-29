@@ -5,7 +5,6 @@ import io
 import re
 import requests
 from PIL import Image, ImageOps
-from supabase import create_client, Client
 
 # ==========================================
 # CREDENCIAIS FIXAS (Garante 0 erros de leitura)
@@ -14,39 +13,57 @@ SUPABASE_URL = "https://ftumdeqziwyljmaehaqk.supabase.co"
 SUPABASE_KEY = "sb_publishable_8qfsBhW22Sx25mvPcxWNvw_4teJRbfu"
 
 # Demais variáveis puxadas com segurança
-FACEBOOK_PAGE_ID = (os.environ.get("FACEBOOK_PAGE_ID") or "").strip()
-FACEBOOK_ACCESS_TOKEN = (os.environ.get("FACEBOOK_ACCESS_TOKEN") or "").strip()
-TELEGRAM_CANAL_TOKEN = (os.environ.get("TELEGRAM_CANAL_TOKEN") or "").strip()
-TELEGRAM_CANAL_ID = (os.environ.get("TELEGRAM_CANAL_ID") or "").strip()
+FACEBOOK_PAGE_ID = "1214303865109377"
+FACEBOOK_ACCESS_TOKEN = "EAAPFihJ9FJcBSWSZBdne8dP0ngvvIbl91jPCzrVi7Ub7HdOIMK6guYcr3ZAA58x2ppYVZBSuwZC9IMx1wMPpBKyAtTkSz5uqi8O4B6VCGKa943WRBVclQNizD2gbKUkckX5TIU3KonoYk7ecTwTpuZARrXd5m1ur14hxYf5qGjNYOw8L53ELcVqdCPr5jFeZCfC7w1dZAst"
+TELEGRAM_CANAL_TOKEN = "8353706833:AAHhyPqgeNezFY1X4NTMegpaPf_UdVOBs04"
+TELEGRAM_CANAL_ID = "-1004406728710"
 
 INTERVALO_MINUTOS = int((os.environ.get("INTERVALO_MINUTOS") or "15").strip())
 
 print("🤖 Iniciando Worker Inteligente (Com e Sem Foto)...")
 
-supabase = None
-try:
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-    print("✅ Conectado ao Supabase com sucesso!")
-except Exception as e:
-    print(f"⚠️ Erro ao criar cliente Supabase: {e}")
+supabase = True
+print("✅ Supabase configurado via REST API!")
 
 def carregar_rascunhos():
-    if not supabase:
-        return []
     try:
-        res = supabase.table("ofertas").select("*").order("created_at", desc=False).execute()
-        return res.data
+        url = f"{SUPABASE_URL}/rest/v1/ofertas?select=*&order=created_at.asc"
+        headers = {
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}"
+        }
+
+        r = requests.get(url, headers=headers, timeout=20)
+
+        if r.status_code != 200:
+            print(f"⚠️ Erro ao buscar ofertas: {r.status_code} - {r.text}")
+            return []
+
+        return r.json()
+
     except Exception as e:
         print(f"⚠️ Erro ao buscar rascunhos: {e}")
         return []
 
+
 def remover_rascunho(rascunho_id):
-    if not supabase:
-        return
     try:
-        supabase.table("ofertas").delete().eq("id", rascunho_id).execute()
+        url = f"{SUPABASE_URL}/rest/v1/ofertas?id=eq.{rascunho_id}"
+        headers = {
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}"
+        }
+
+        r = requests.delete(url, headers=headers, timeout=20)
+
+        if r.status_code not in (200, 204):
+            print(f"⚠️ Erro ao remover oferta {rascunho_id}: {r.status_code} - {r.text}")
+        else:
+            print(f"🗑️ Oferta {rascunho_id} removida da fila.")
+
     except Exception as e:
-        print(f"Erro ao remover rascunho: {e}")
+        print(f"⚠️ Erro ao remover rascunho: {e}")
+
 
 def extrair_dados_do_texto_bruto(texto_bruto):
     if not texto_bruto:
@@ -181,6 +198,166 @@ def enviar_facebook(texto, link, imagem_url=None):
         print(f"⚠️ Erro no Facebook: {e}")
         return False
 
+
+# ==========================================
+# DIVULGAÇÕES AUTOMÁTICAS
+# ==========================================
+
+def obter_numero_divulgacao():
+    try:
+        url = (
+            f"{SUPABASE_URL}/rest/v1/controle_divulgacao"
+            "?select=proxima_mensagem&limit=1"
+        )
+
+        headers = {
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}"
+        }
+
+        r = requests.get(url, headers=headers, timeout=20)
+
+        if r.status_code != 200:
+            print(f"⚠️ Erro no controle: {r.status_code} - {r.text}")
+            return 1
+
+        dados = r.json()
+
+        if not dados:
+            return 1
+
+        numero = int(dados[0].get("proxima_mensagem", 1))
+
+        if numero < 1 or numero > 11:
+            numero = 1
+
+        return numero
+
+    except Exception as e:
+        print(f"⚠️ Erro ao ler controle: {e}")
+        return 1
+
+
+def buscar_proxima_divulgacao():
+    try:
+        numero = obter_numero_divulgacao()
+
+        url = (
+            f"{SUPABASE_URL}/rest/v1/mensagens_divulgacao"
+            f"?id=eq.{numero}"
+            "&select=id,mensagem,imagem"
+        )
+
+        headers = {
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}"
+        }
+
+        r = requests.get(url, headers=headers, timeout=20)
+
+        if r.status_code != 200:
+            print(
+                f"⚠️ Erro ao buscar divulgação: "
+                f"{r.status_code} - {r.text}"
+            )
+            return None
+
+        dados = r.json()
+
+        if not dados:
+            print(f"⚠️ Mensagem {numero} não encontrada.")
+            return None
+
+        return dados[0]
+
+    except Exception as e:
+        print(f"⚠️ Erro ao buscar divulgação: {e}")
+        return None
+
+
+def avancar_divulgacao():
+    try:
+        atual = obter_numero_divulgacao()
+        proxima = atual + 1
+
+        if proxima > 11:
+            proxima = 1
+
+        url = (
+            f"{SUPABASE_URL}/rest/v1/controle_divulgacao"
+            f"?proxima_mensagem=eq.{atual}"
+        )
+
+        headers = {
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal"
+        }
+
+        r = requests.patch(
+            url,
+            headers=headers,
+            json={"proxima_mensagem": proxima},
+            timeout=20
+        )
+
+        if r.status_code not in (200, 204):
+            print(
+                f"⚠️ Erro ao avançar divulgação: "
+                f"{r.status_code} - {r.text}"
+            )
+            return False
+
+        print(f"🔄 Próxima divulgação: mensagem {proxima}")
+        return True
+
+    except Exception as e:
+        print(f"⚠️ Erro ao atualizar controle: {e}")
+        return False
+
+
+def executar_divulgacao():
+    mensagem = buscar_proxima_divulgacao()
+
+    if not mensagem:
+        return False
+
+    numero = mensagem.get("id")
+    texto = mensagem.get("mensagem") or ""
+    imagem = mensagem.get("imagem") or ""
+
+    if not texto:
+        print(f"⚠️ Divulgação {numero} está sem texto.")
+        return False
+
+    if not imagem:
+        print(f"⚠️ Divulgação {numero} está sem imagem.")
+        return False
+
+    print(f"📢 Enviando divulgação {numero}/11...")
+    print(f"🖼️ Imagem: {imagem}")
+
+    sucesso = enviar_facebook(
+        texto=texto,
+        link="",
+        imagem_url=imagem
+    )
+
+    if sucesso:
+        print(f"✅ Divulgação {numero} publicada no Facebook!")
+        avancar_divulgacao()
+        return True
+
+    print(f"❌ Falha ao publicar divulgação {numero}.")
+    return False
+
+
+# ==========================================
+# FIM DAS DIVULGAÇÕES AUTOMÁTICAS
+# ==========================================
+
+
 # Loop principal do robô
 while True:
     try:
@@ -208,8 +385,21 @@ while True:
                 time.sleep(60)
                 continue
         else:
-            print("⏳ Fila vazia. Verificando novamente em 30 segundos...")
-            time.sleep(30)
+            print("📭 Fila de ofertas vazia.")
+            print("📢 Verificando próxima mensagem de divulgação...")
+
+            ok_divulgacao = executar_divulgacao()
+
+            if ok_divulgacao:
+                print(
+                    f"✅ Divulgação enviada. "
+                    f"Aguardando {INTERVALO_MINUTOS} min para o próximo ciclo..."
+                )
+                time.sleep(INTERVALO_MINUTOS * 60)
+            else:
+                print("⚠️ Nenhuma divulgação enviada. Tentando novamente em 30 segundos...")
+                time.sleep(30)
+
             continue
         
         time.sleep(INTERVALO_MINUTOS * 60)
