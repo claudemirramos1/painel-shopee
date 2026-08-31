@@ -1,4 +1,5 @@
 import os
+import time
 import requests
 from google import genai
 
@@ -78,38 +79,48 @@ def classificar_promocao(texto_post):
             """
             modelos = ['gemini-3.6-flash', 'gemini-3.5-flash']
             for modelo in modelos:
-                try:
-                    response = client.models.generate_content(
-                        model=modelo,
-                        contents=prompt,
-                        config={"automatic_function_calling": {"disable": True}}
-                    )
-                    categoria = response.text.strip().upper()
-                    if categoria in PAGINAS_DESTINO:
-                        return categoria
-                except Exception as e:
-                    print(f"[IA AVISO] Erro no modelo {modelo}: {e}")
+                tentativas = 0
+                while tentativas < 2:
+                    try:
+                        response = client.models.generate_content(
+                            model=modelo,
+                            contents=prompt,
+                            config={"automatic_function_calling": {"disable": True}}
+                        )
+                        categoria = response.text.strip().upper()
+                        if categoria in PAGINAS_DESTINO:
+                            return categoria
+                        break
+                    except Exception as e:
+                        # Se estourar o limite por minuto (Erro 429), aguarda 15 segundos e tenta novamente
+                        if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                            print(f"[IA AVISO] Limite de requisições atingido. Aguardando 15s para nova tentativa...")
+                            time.sleep(15)
+                            tentativas += 1
+                        else:
+                            print(f"[IA AVISO] Erro no modelo {modelo}: {e}")
+                            break
         except Exception as e:
             print(f"[IA AVISO] Falha ao inicializar o cliente Gemini: {e}")
 
     print("[LOG] Usando classificação por palavras-chave local.")
     return classificar_por_palavras_chave(texto_post)
 
-def buscar_ultimo_post():
+def buscar_ultimos_posts(limite=5):
     url = f"https://graph.facebook.com/v20.0/{PAGINA_ORIGEM_ID}/posts"
     params = {
         "access_token": PAGINA_ORIGEM_TOKEN,
-        "limit": 1,
+        "limit": limite,
         "fields": "id,message,full_picture,created_time"
     }
     try:
         resp = requests.get(url, params=params, timeout=10)
         data = resp.json()
-        if "data" in data and len(data["data"]) > 0:
-            return data["data"][0]
+        if "data" in data:
+            return data["data"]
     except Exception as e:
         print(f"[ERRO FACEBOOK] Falha ao buscar posts: {e}")
-    return None
+    return []
 
 def republicar_para_destino(post, categoria):
     destino = PAGINAS_DESTINO.get(categoria)
@@ -139,25 +150,36 @@ def republicar_para_destino(post, categoria):
 
 def executar_bot():
     posts_processados = carregar_historico()
-    print("🤖 Executando verificação do Bot no Termux...")
+    print("🤖 Executando verificação segura do Bot...")
     
     try:
-        post = buscar_ultimo_post()
-        if post:
-            post_id = post["id"]
-            if post_id not in posts_processados:
-                mensagem = post.get("message", "")
-                if mensagem:
-                    print(f"🔍 Novo post detectado: {post_id}")
-                    categoria = classificar_promocao(mensagem)
-                    if categoria:
-                        print(f"🎯 Categoria identificada: {categoria}")
-                        sucesso = republicar_para_destino(post, categoria)
-                        if sucesso:
+        posts = buscar_ultimos_posts(limite=5)
+        if posts:
+            novos_posts = [p for p in posts if p["id"] not in posts_processados]
+            
+            if novos_posts:
+                print(f"🔍 {len(novos_posts)} novos posts encontrados. Processando com segurança de limite...")
+                
+                for post in reversed(novos_posts):
+                    post_id = post["id"]
+                    mensagem = post.get("message", "")
+                    
+                    if mensagem:
+                        print(f"\n📦 Processando post: {post_id}")
+                        categoria = classificar_promocao(mensagem)
+                        if categoria:
+                            print(f"🎯 Categoria identificada: {categoria}")
+                            sucesso = republicar_para_destino(post, categoria)
+                            if sucesso:
+                                salvar_no_historico(post_id)
+                        else:
+                            print("⚠️ Post não pertence a nenhuma das 5 categorias.")
                             salvar_no_historico(post_id)
                     else:
-                        print("⚠️ Post não pertence a nenhuma das 5 categorias.")
                         salvar_no_historico(post_id)
+                    
+                    # Pausa de 15 segundos entre posts para respeitar estritamente o limite gratuito (máx 5 RPM)
+                    time.sleep(15)
             else:
                 print("⏳ Nenhuma promoção nova na página de origem.")
         else:
