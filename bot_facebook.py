@@ -38,6 +38,23 @@ PAGINAS_DESTINO = {
 
 posts_processados = set()
 
+def classificar_por_palavras_chave(texto):
+    """Fallback local para quando a API atinge limite de cota."""
+    texto_lower = texto.lower()
+    
+    keywords = {
+        "BEBE_INFANTIL": ["fralda", "bebê", "bebe", "infantil", "mamadeira", "chocalho", "carrinho de bebê", "body", "brinquedo"],
+        "AUTOMOTIVO": ["carro", "moto", "pneu", "capacete", "óleo", "oleo", "automotivo", "led para carro", "suporte celular carro"],
+        "MODA_FEMININA": ["vestido", "saia", "blusa feminina", "sutiã", "lingerie", "bolsa feminina", "saltos", "maquiagem"],
+        "MODA_MASCULINA": ["camisa masculina", "camiseta masculina", "barbeador", "carteira masculina", "bermuda masculina", "sapato masculino"],
+        "ELETRONICOS": ["fone", "bluetooth", "celular", "carregador", "smartwatch", "tv", "notebook", "xiaomi", "cabo usb"]
+    }
+
+    for cat, termos in keywords.items():
+        if any(termo in texto_lower for termo in termos):
+            return cat
+    return None
+
 def classificar_promocao(texto_post):
     prompt = f"""
     Sua tarefa é analisar o texto de uma promoção e classificá-lo estritamente em UMA destas 5 categorias:
@@ -54,21 +71,31 @@ def classificar_promocao(texto_post):
     Texto da promoção:
     \"\"\"{texto_post}\"\"\"
     """
-    try:
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=prompt,
-            config={"automatic_function_calling": {"disable": True}}
-        )
-        categoria = response.text.strip().upper()
-        if categoria in PAGINAS_DESTINO:
-            return categoria
-        else:
-            print(f"[AVISO IA] Categoria não identificada: {categoria}")
-            return None
-    except Exception as e:
-        print(f"[ERRO GEMINI] Falha ao classificar com a IA: {e}")
-        return None
+    modelos = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.5-flash']
+    
+    for modelo in modelos:
+        for tentativa in range(1, 4):
+            try:
+                response = client.models.generate_content(
+                    model=modelo,
+                    contents=prompt,
+                    config={"automatic_function_calling": {"disable": True}}
+                )
+                categoria = response.text.strip().upper()
+                if categoria in PAGINAS_DESTINO:
+                    return categoria
+            except Exception as e:
+                erro_str = str(e)
+                print(f"[RETRY {tentativa}/3 - {modelo}] Erro: {erro_str[:120]}...")
+                if "429" in erro_str or "RESOURCE_EXHAUSTED" in erro_str:
+                    tempo_espera = 18 * tentativa
+                    print(f"⏳ Cota excedida no {modelo}. Aguardando {tempo_espera}s antes de tentar novamente...")
+                    time.sleep(tempo_espera)
+                else:
+                    time.sleep(2)
+                
+    print("⚠️ API esgotada/indisponível. Usando filtro local por palavras-chave...")
+    return classificar_por_palavras_chave(texto_post)
 
 def buscar_ultimo_post():
     url = f"https://graph.facebook.com/v20.0/{PAGINA_ORIGEM_ID}/posts"
@@ -130,7 +157,7 @@ def executar_bot():
         return
 
     print(f"🔍 Novo post detectado: {post_id}")
-    print("🤖 Classificando categoria com o Gemini...")
+    print("🤖 Classificando categoria...")
     
     categoria = classificar_promocao(mensagem)
     if categoria:
