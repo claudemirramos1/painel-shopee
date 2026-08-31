@@ -138,14 +138,13 @@ def republicar_para_destino(post, categoria):
 
 def executar_bot():
     posts_processados = carregar_historico()
-    print("🤖 [FILA] Buscando posts recentes e cruzando com a âncora do histórico...")
+    print("🤖 [FILA] Buscando posts recentes e cruzando com a âncora...")
     
     posts = buscar_posts_origem(limite=10)
     if not posts:
         print("📭 Nenhum post retornado do Facebook.")
         return
 
-    # Filtra apenas os que NÃO estão no histórico (encontra o que está pendente acima da âncora)
     novos_posts = [p for p in posts if p["id"] not in posts_processados]
     
     if not novos_posts:
@@ -154,7 +153,7 @@ def executar_bot():
 
     print(f"🔍 Encontrados {len(novos_posts)} novos produtos para processar.")
     
-    # Processa estritamente de baixo para cima (do mais antigo para o mais recente)
+    houve_atualizacao = False
     for post in reversed(novos_posts):
         post_id = post["id"]
         mensagem = post.get("message", "")
@@ -167,13 +166,18 @@ def executar_bot():
                 sucesso = republicar_para_destino(post, categoria)
                 if sucesso:
                     salvar_no_historico(post_id)
+                    houve_atualizacao = True
             else:
-                print("⚠️ Post sem categoria válida. Registrando no histórico para pular.")
+                print("⚠️ Post sem categoria válida. Registrando no histórico.")
                 salvar_no_historico(post_id)
+                houve_atualizacao = True
         else:
             salvar_no_historico(post_id)
+            houve_atualizacao = True
         
         time.sleep(5)
+        
+    return houve_atualizacao
 
 if __name__ == "__main__":
     executar_bot()

@@ -1,4 +1,4 @@
-name: Bot Facebook Promomania
+name: Executar Bot Shopee
 
 on:
   schedule:
@@ -8,6 +8,8 @@ on:
 jobs:
   executar-bot:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Baixar código
         uses: actions/checkout@v4
@@ -19,7 +21,7 @@ jobs:
 
       - name: Instalar dependências
         run: |
-          pip install google-genai requests
+          pip install requests google-genai
 
       - name: Bot Executor
         env:
@@ -27,10 +29,10 @@ jobs:
         run: |
           python bot_facebook.py
 
-      - name: Salvar histórico de posts
+      - name: Salvar histórico atualizado no GitHub
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add posts_processados.txt || true
-          git commit -m "Chore: atualiza historico de posts" || true
-          git push || true
+          git add posts_processados.txt
+          git diff --staged --quiet || git commit -m "Auto: atualiza historico de posts processados"
+          git push
