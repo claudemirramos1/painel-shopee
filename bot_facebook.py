@@ -55,8 +55,11 @@ def classificar_promocao(texto_post):
     \"\"\"{texto_post}\"\"\"
     """
     try:
-        chat = client.chats.create(model='gemini-2.5-flash')
-        response = chat.send_message(prompt)
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt,
+            config={"automatic_function_calling": {"disable": True}}
+        )
         categoria = response.text.strip().upper()
         if categoria in PAGINAS_DESTINO:
             return categoria
