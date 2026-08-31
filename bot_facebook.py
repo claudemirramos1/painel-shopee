@@ -36,12 +36,20 @@ PAGINAS_DESTINO = {
     }
 }
 
-posts_processados = set()
+ARQUIVO_HISTORICO = os.path.expanduser("~/painel-shopee/posts_processados.txt")
+
+def carregar_historico():
+    if os.path.exists(ARQUIVO_HISTORICO):
+        with open(ARQUIVO_HISTORICO, "r", encoding="utf-8") as f:
+            return set(line.strip() for line in f if line.strip())
+    return set()
+
+def salvar_no_historico(post_id):
+    with open(ARQUIVO_HISTORICO, "a", encoding="utf-8") as f:
+        f.write(f"{post_id}\n")
 
 def classificar_por_palavras_chave(texto):
-    """Fallback local para quando a API atinge limite de cota."""
     texto_lower = texto.lower()
-    
     keywords = {
         "BEBE_INFANTIL": ["fralda", "bebê", "bebe", "infantil", "mamadeira", "chocalho", "carrinho de bebê", "body", "brinquedo"],
         "AUTOMOTIVO": ["carro", "moto", "pneu", "capacete", "óleo", "oleo", "automotivo", "led para carro", "suporte celular carro"],
@@ -71,30 +79,21 @@ def classificar_promocao(texto_post):
     Texto da promoção:
     \"\"\"{texto_post}\"\"\"
     """
-    modelos = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.5-flash']
+    modelos = ['gemini-3.6-flash', 'gemini-3.5-flash']
     
     for modelo in modelos:
-        for tentativa in range(1, 4):
-            try:
-                response = client.models.generate_content(
-                    model=modelo,
-                    contents=prompt,
-                    config={"automatic_function_calling": {"disable": True}}
-                )
-                categoria = response.text.strip().upper()
-                if categoria in PAGINAS_DESTINO:
-                    return categoria
-            except Exception as e:
-                erro_str = str(e)
-                print(f"[RETRY {tentativa}/3 - {modelo}] Erro: {erro_str[:120]}...")
-                if "429" in erro_str or "RESOURCE_EXHAUSTED" in erro_str:
-                    tempo_espera = 18 * tentativa
-                    print(f"⏳ Cota excedida no {modelo}. Aguardando {tempo_espera}s antes de tentar novamente...")
-                    time.sleep(tempo_espera)
-                else:
-                    time.sleep(2)
+        try:
+            response = client.models.generate_content(
+                model=modelo,
+                contents=prompt,
+                config={"automatic_function_calling": {"disable": True}}
+            )
+            categoria = response.text.strip().upper()
+            if categoria in PAGINAS_DESTINO:
+                return categoria
+        except Exception as e:
+            print(f"[IA AVISO] Erro temporário no {modelo}. Usando modo de segurança.")
                 
-    print("⚠️ API esgotada/indisponível. Usando filtro local por palavras-chave...")
     return classificar_por_palavras_chave(texto_post)
 
 def buscar_ultimo_post():
@@ -140,33 +139,38 @@ def republicar_para_destino(post, categoria):
     return False
 
 def executar_bot():
-    print("🤖 Bot Distribuidor de Conteúdo Iniciado!")
-    post = buscar_ultimo_post()
-    if not post:
-        print("📭 Nenhum post encontrado na página de origem.")
-        return
-
-    post_id = post["id"]
-    if post_id in posts_processados:
-        print(f"⏳ Post {post_id} já foi processado anteriormente.")
-        return
-
-    mensagem = post.get("message", "")
-    if not mensagem:
-        print(f"⚠️ Post {post_id} não contém texto para classificação.")
-        return
-
-    print(f"🔍 Novo post detectado: {post_id}")
-    print("🤖 Classificando categoria...")
+    posts_processados = carregar_historico()
+    print("🤖 Bot Distribuidor de Conteúdo em Execução Contínua (Intervalo: 5 minutos)")
     
-    categoria = classificar_promocao(mensagem)
-    if categoria:
-        print(f"🎯 Categoria identificada: {categoria}")
-        sucesso = republicar_para_destino(post, categoria)
-        if sucesso:
-            posts_processados.add(post_id)
-    else:
-        print("⚠️ Post não pertence a nenhuma das 5 categorias configuradas.")
+    while True:
+        try:
+            post = buscar_ultimo_post()
+            if post:
+                post_id = post["id"]
+                if post_id not in posts_processados:
+                    mensagem = post.get("message", "")
+                    if mensagem:
+                        print(f"🔍 Novo post detectado: {post_id}")
+                        categoria = classificar_promocao(mensagem)
+                        if categoria:
+                            print(f"🎯 Categoria identificada: {categoria}")
+                            sucesso = republicar_para_destino(post, categoria)
+                            if sucesso:
+                                posts_processados.add(post_id)
+                                salvar_no_historico(post_id)
+                        else:
+                            print("⚠️ Post não pertence a nenhuma das 5 categorias.")
+                            posts_processados.add(post_id)
+                            salvar_no_historico(post_id)
+                else:
+                    print("⏳ Nenhuma promoção nova na página de origem.")
+            else:
+                print("📭 Nenhum post retornado do Facebook.")
+        except Exception as e:
+            print(f"⚠️ Erro inesperado na verificação: {e}")
+
+        # Aguarda 5 minutos (300 segundos) para a próxima verificação
+        time.sleep(300)
 
 if __name__ == "__main__":
     executar_bot()
