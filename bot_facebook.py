@@ -139,7 +139,7 @@ def republicar_para_destino(post, categoria):
 
 def executar_bot():
     posts_processados = carregar_historico()
-    print("🤖 Executando verificação do Bot no GitHub Actions...")
+    print("🤖 Executando verificação do Bot no Termux...")
     
     try:
         post = buscar_ultimo_post()
