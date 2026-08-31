@@ -1,5 +1,4 @@
 import os
-import time
 import requests
 from google import genai
 
@@ -52,7 +51,7 @@ def classificar_por_palavras_chave(texto):
     texto_lower = texto.lower()
     keywords = {
         "BEBE_INFANTIL": ["fralda", "bebê", "bebe", "infantil", "mamadeira", "chocalho", "carrinho de bebê", "body", "brinquedo"],
-        "AUTOMOTIVO": ["carro", "moto", "pneu", "capacete", "óleo", "oleo", "automotivo", "led para carro", "suporte celular carro"],
+        "AUTOMOTIVO": ["carro", "moto", "pneu", "capacete", "óleo", "oleo", "automotivo", "led para carro", "suporte celular carro", "amortecedor", "porta malas", "tampa traseira"],
         "MODA_FEMININA": ["vestido", "saia", "blusa feminina", "sutiã", "lingerie", "bolsa feminina", "saltos", "maquiagem"],
         "MODA_MASCULINA": ["camisa masculina", "camiseta masculina", "barbeador", "carteira masculina", "bermuda masculina", "sapato masculino"],
         "ELETRONICOS": ["fone", "bluetooth", "celular", "carregador", "smartwatch", "tv", "notebook", "xiaomi", "cabo usb"]
@@ -64,36 +63,38 @@ def classificar_por_palavras_chave(texto):
     return None
 
 def classificar_promocao(texto_post):
-    prompt = f"""
-    Sua tarefa é analisar o texto de uma promoção e classificá-lo estritamente em UMA destas 5 categorias:
-    - BEBE_INFANTIL
-    - AUTOMOTIVO
-    - MODA_FEMININA
-    - MODA_MASCULINA
-    - ELETRONICOS
+    if GEMINI_API_KEY:
+        prompt = f"""
+        Sua tarefa é analisar o texto de uma promoção e classificá-lo estritamente em UMA destas 5 categorias:
+        - BEBE_INFANTIL
+        - AUTOMOTIVO
+        - MODA_FEMININA
+        - MODA_MASCULINA
+        - ELETRONICOS
 
-    Regras:
-    - Responda APENAS com o nome da categoria exata em letras maiúsculas.
-    - Não adicione explicações, pontuação ou texto adicional.
+        Regras:
+        - Responda APENAS com o nome da categoria exata em letras maiúsculas.
+        - Não adicione explicações, pontuação ou texto adicional.
 
-    Texto da promoção:
-    \"\"\"{texto_post}\"\"\"
-    """
-    modelos = ['gemini-3.6-flash', 'gemini-3.5-flash']
-    
-    for modelo in modelos:
-        try:
-            response = client.models.generate_content(
-                model=modelo,
-                contents=prompt,
-                config={"automatic_function_calling": {"disable": True}}
-            )
-            categoria = response.text.strip().upper()
-            if categoria in PAGINAS_DESTINO:
-                return categoria
-        except Exception as e:
-            print(f"[IA AVISO] Erro temporário no {modelo}. Usando filtro local.")
+        Texto da promoção:
+        \"\"\"{texto_post}\"\"\"
+        """
+        modelos = ['gemini-3.6-flash', 'gemini-3.5-flash']
+        
+        for modelo in modelos:
+            try:
+                response = client.models.generate_content(
+                    model=modelo,
+                    contents=prompt,
+                    config={"automatic_function_calling": {"disable": True}}
+                )
+                categoria = response.text.strip().upper()
+                if categoria in PAGINAS_DESTINO:
+                    return categoria
+            except Exception as e:
+                print(f"[IA AVISO] Erro na IA ({modelo}): {e}. Tentando fallback.")
                 
+    print("[LOG] Usando classificação por palavras-chave local.")
     return classificar_por_palavras_chave(texto_post)
 
 def buscar_ultimo_post():
