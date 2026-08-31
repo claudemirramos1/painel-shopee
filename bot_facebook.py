@@ -36,7 +36,7 @@ PAGINAS_DESTINO = {
     }
 }
 
-ARQUIVO_HISTORICO = os.path.expanduser("~/painel-shopee/posts_processados.txt")
+ARQUIVO_HISTORICO = os.path.expanduser("posts_processados.txt")
 
 def carregar_historico():
     if os.path.exists(ARQUIVO_HISTORICO):
@@ -92,7 +92,7 @@ def classificar_promocao(texto_post):
             if categoria in PAGINAS_DESTINO:
                 return categoria
         except Exception as e:
-            print(f"[IA AVISO] Erro temporário no {modelo}. Usando modo de segurança.")
+            print(f"[IA AVISO] Erro temporário no {modelo}. Usando filtro local.")
                 
     return classificar_por_palavras_chave(texto_post)
 
@@ -140,37 +140,31 @@ def republicar_para_destino(post, categoria):
 
 def executar_bot():
     posts_processados = carregar_historico()
-    print("🤖 Bot Distribuidor de Conteúdo em Execução Contínua (Intervalo: 5 minutos)")
+    print("🤖 Executando verificação do Bot no GitHub Actions...")
     
-    while True:
-        try:
-            post = buscar_ultimo_post()
-            if post:
-                post_id = post["id"]
-                if post_id not in posts_processados:
-                    mensagem = post.get("message", "")
-                    if mensagem:
-                        print(f"🔍 Novo post detectado: {post_id}")
-                        categoria = classificar_promocao(mensagem)
-                        if categoria:
-                            print(f"🎯 Categoria identificada: {categoria}")
-                            sucesso = republicar_para_destino(post, categoria)
-                            if sucesso:
-                                posts_processados.add(post_id)
-                                salvar_no_historico(post_id)
-                        else:
-                            print("⚠️ Post não pertence a nenhuma das 5 categorias.")
-                            posts_processados.add(post_id)
+    try:
+        post = buscar_ultimo_post()
+        if post:
+            post_id = post["id"]
+            if post_id not in posts_processados:
+                mensagem = post.get("message", "")
+                if mensagem:
+                    print(f"🔍 Novo post detectado: {post_id}")
+                    categoria = classificar_promocao(mensagem)
+                    if categoria:
+                        print(f"🎯 Categoria identificada: {categoria}")
+                        sucesso = republicar_para_destino(post, categoria)
+                        if sucesso:
                             salvar_no_historico(post_id)
-                else:
-                    print("⏳ Nenhuma promoção nova na página de origem.")
+                    else:
+                        print("⚠️ Post não pertence a nenhuma das 5 categorias.")
+                        salvar_no_historico(post_id)
             else:
-                print("📭 Nenhum post retornado do Facebook.")
-        except Exception as e:
-            print(f"⚠️ Erro inesperado na verificação: {e}")
-
-        # Aguarda 5 minutos (300 segundos) para a próxima verificação
-        time.sleep(300)
+                print("⏳ Nenhuma promoção nova na página de origem.")
+        else:
+            print("📭 Nenhum post retornado do Facebook.")
+    except Exception as e:
+        print(f"⚠️ Erro inesperado na verificação: {e}")
 
 if __name__ == "__main__":
     executar_bot()
