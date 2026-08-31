@@ -90,7 +90,7 @@ def classificar_promocao(texto_post):
                 except Exception as e:
                     print(f"[IA AVISO] Erro no modelo {modelo}: {e}")
         except Exception as e:
-            print(f"[IA AVISO] Falha ao inicializar o cliente Gemini: {e}")
+            print(f"[IA AVISO] Falha ao inicializar a IA: {e}")
 
     print("[LOG] Usando classificação por palavras-chave local.")
     return classificar_por_palavras_chave(texto_post)
