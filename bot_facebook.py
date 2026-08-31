@@ -3,8 +3,12 @@ import time
 import requests
 from google import genai
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else genai.Client()
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
+
+if GEMINI_API_KEY:
+    client = genai.Client(api_key=GEMINI_API_KEY)
+else:
+    client = genai.Client()
 
 PAGINA_ORIGEM_ID = "1214303865109377"
 PAGINA_ORIGEM_TOKEN = "EAAPFihJ9FJcBSWSZBdne8dP0ngvvIbl91jPCzrVi7Ub7HdOIMK6guYcr3ZAA58x2ppYVZBSuwZC9IMx1wMPpBKyAtTkSz5uqi8O4B6VCGKa943WRBVclQNizD2gbKUkckX5TIU3KonoYk7ecTwTpuZARrXd5m1ur14hxYf5qGjNYOw8L53ELcVqdCPr5jFeZCfC7w1dZAst"
@@ -51,10 +55,8 @@ def classificar_promocao(texto_post):
     \"\"\"{texto_post}\"\"\"
     """
     try:
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=prompt,
-        )
+        chat = client.chats.create(model='gemini-2.5-flash')
+        response = chat.send_message(prompt)
         categoria = response.text.strip().upper()
         if categoria in PAGINAS_DESTINO:
             return categoria
