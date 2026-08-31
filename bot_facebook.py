@@ -4,11 +4,6 @@ from google import genai
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 
-if GEMINI_API_KEY:
-    client = genai.Client(api_key=GEMINI_API_KEY)
-else:
-    client = genai.Client()
-
 PAGINA_ORIGEM_ID = "1214303865109377"
 PAGINA_ORIGEM_TOKEN = "EAAPFihJ9FJcBSWSZBdne8dP0ngvvIbl91jPCzrVi7Ub7HdOIMK6guYcr3ZAA58x2ppYVZBSuwZC9IMx1wMPpBKyAtTkSz5uqi8O4B6VCGKa943WRBVclQNizD2gbKUkckX5TIU3KonoYk7ecTwTpuZARrXd5m1ur14hxYf5qGjNYOw8L53ELcVqdCPr5jFeZCfC7w1dZAst"
 
@@ -64,36 +59,39 @@ def classificar_por_palavras_chave(texto):
 
 def classificar_promocao(texto_post):
     if GEMINI_API_KEY:
-        prompt = f"""
-        Sua tarefa é analisar o texto de uma promoção e classificá-lo estritamente em UMA destas 5 categorias:
-        - BEBE_INFANTIL
-        - AUTOMOTIVO
-        - MODA_FEMININA
-        - MODA_MASCULINA
-        - ELETRONICOS
+        try:
+            client = genai.Client(api_key=GEMINI_API_KEY)
+            prompt = f"""
+            Sua tarefa é analisar o texto de uma promoção e classificá-lo estritamente em UMA destas 5 categorias:
+            - BEBE_INFANTIL
+            - AUTOMOTIVO
+            - MODA_FEMININA
+            - MODA_MASCULINA
+            - ELETRONICOS
 
-        Regras:
-        - Responda APENAS com o nome da categoria exata em letras maiúsculas.
-        - Não adicione explicações, pontuação ou texto adicional.
+            Regras:
+            - Responda APENAS com o nome da categoria exata em letras maiúsculas.
+            - Não adicione explicações, pontuação ou texto adicional.
 
-        Texto da promoção:
-        \"\"\"{texto_post}\"\"\"
-        """
-        modelos = ['gemini-3.6-flash', 'gemini-3.5-flash']
-        
-        for modelo in modelos:
-            try:
-                response = client.models.generate_content(
-                    model=modelo,
-                    contents=prompt,
-                    config={"automatic_function_calling": {"disable": True}}
-                )
-                categoria = response.text.strip().upper()
-                if categoria in PAGINAS_DESTINO:
-                    return categoria
-            except Exception as e:
-                print(f"[IA AVISO] Erro na IA ({modelo}): {e}. Tentando fallback.")
-                
+            Texto da promoção:
+            \"\"\"{texto_post}\"\"\"
+            """
+            modelos = ['gemini-3.6-flash', 'gemini-3.5-flash']
+            for modelo in modelos:
+                try:
+                    response = client.models.generate_content(
+                        model=modelo,
+                        contents=prompt,
+                        config={"automatic_function_calling": {"disable": True}}
+                    )
+                    categoria = response.text.strip().upper()
+                    if categoria in PAGINAS_DESTINO:
+                        return categoria
+                except Exception as e:
+                    print(f"[IA AVISO] Erro no modelo {modelo}: {e}")
+        except Exception as e:
+            print(f"[IA AVISO] Falha ao inicializar o cliente Gemini: {e}")
+
     print("[LOG] Usando classificação por palavras-chave local.")
     return classificar_por_palavras_chave(texto_post)
 
