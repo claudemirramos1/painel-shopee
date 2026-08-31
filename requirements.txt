@@ -1,5 +1,2 @@
-streamlit
-supabase
+google-genai
 requests
-pillow
-pandas
