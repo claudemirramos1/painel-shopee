@@ -3,8 +3,11 @@ import time
 import requests
 from google import genai
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6LlhLdStch5R9CeKr0Aam13egubrZuj3Cx1868P2flcgw")
-client = genai.Client(api_key=GEMINI_API_KEY)
+# Pega a chave da variável de ambiente GEMINI_API_KEY
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+
+# Inicializa o cliente oficial
+client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else genai.Client()
 
 PAGINA_ORIGEM_ID = "1214303865109377"
 PAGINA_ORIGEM_TOKEN = "EAAPFihJ9FJcBSWSZBdne8dP0ngvvIbl91jPCzrVi7Ub7HdOIMK6guYcr3ZAA58x2ppYVZBSuwZC9IMx1wMPpBKyAtTkSz5uqi8O4B6VCGKa943WRBVclQNizD2gbKUkckX5TIU3KonoYk7ecTwTpuZARrXd5m1ur14hxYf5qGjNYOw8L53ELcVqdCPr5jFeZCfC7w1dZAst"
