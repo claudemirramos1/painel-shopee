@@ -2,7 +2,7 @@ name: Bot Facebook Promomania
 
 on:
   schedule:
-    - cron: '0 */3 * * *'
+    - cron: '*/30 * * * *'
   workflow_dispatch:
 
 jobs:
@@ -26,3 +26,11 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           python bot_facebook.py
+
+      - name: Salvar histórico de posts
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add posts_processados.txt || true
+          git commit -m "Chore: atualiza historico de posts" || true
+          git push || true
