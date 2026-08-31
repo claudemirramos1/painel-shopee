@@ -2,15 +2,13 @@ name: Bot Distribuidor Facebook
 
 on:
   schedule:
-    - cron: '*/5 * * * *'
-  workflow_dispatch:
-
-permissions:
-  contents: write
+    - cron: '*/30 * * * *' # Roda a cada 30 minutos
+  workflow_dispatch: # Permite rodar manualmente
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+
     steps:
       - name: Baixar código
         uses: actions/checkout@v4
@@ -23,17 +21,17 @@ jobs:
       - name: Instalar dependências
         run: |
           python -m pip install --upgrade pip
-          pip install google-genai requests
+          pip install requests google-genai
 
       - name: Executar Bot
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: |
-          python bot_facebook.py
+        run: python bot_facebook.py
 
-      - name: Salvar histórico de posts processados
+      - name: Salvar histórico de posts no Git
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add posts_processados.txt || true
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto: atualiza historico de posts processados" && git push)
+          git commit -m "Chore: atualiza historico de posts" || true
+          git push
