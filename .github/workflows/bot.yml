@@ -2,19 +2,21 @@ name: Bot Distribuidor Facebook
 
 on:
   schedule:
-    # Roda a cada 5 minutos
     - cron: '*/5 * * * *'
-  workflow_dispatch: # Permite rodar manualmente no painel do GitHub
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
     steps:
       - name: Baixar repositório
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Configurar Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
@@ -34,5 +36,4 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add posts_processados.txt || true
-          git commit -m "Auto: atualiza historico de posts processados" || true
-          git push
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto: atualiza historico de posts processados" && git push)
