@@ -48,54 +48,158 @@ def salvar_no_historico(post_id):
         f.write(f"{post_id}\n")
 
 def classificar_por_palavras_chave(texto):
+    """
+    Fallback caso a Gemini não esteja disponível.
+    As palavras-chave servem apenas como auxílio.
+    Se não houver correspondência clara, envia para PromoManiaOfertas.
+    """
     texto_lower = texto.lower()
+
+    palavras_outros = [
+        "pote", "potes",
+        "escorredor", "escorredor de louça", "escorredor de pratos",
+        "talheres", "garfo", "faca", "colher",
+        "prato", "panela", "frigideira", "assadeira", "forma",
+        "travessa", "copo", "taça", "jarra",
+        "ralador", "peneira", "abridor",
+        "tábua de corte", "tábua de cozinha",
+        "utensílio de cozinha", "utensilios de cozinha",
+        "organizador de cozinha",
+        "cozinha", "casa", "utilidades domésticas",
+        "limpeza", "organizador doméstico"
+    ]
+
+    if any(termo in texto_lower for termo in palavras_outros):
+        return "PROMONOMIA_OFERTAS"
+
     keywords = {
-        "BEBE_INFANTIL": ["fralda", "bebê", "bebe", "infantil", "mamadeira", "chocalho", "carrinho de bebê", "body", "brinquedo"],
-        "AUTOMOTIVO": ["carro", "moto", "pneu", "capacete", "óleo", "oleo", "automotivo", "led para carro", "suporte celular carro", "amortecedor", "porta malas", "tampa traseira"],
-        "MODA_FEMININA": ["vestido", "saia", "blusa feminina", "sutiã", "lingerie", "bolsa feminina", "saltos", "maquiagem"],
-        "MODA_MASCULINA": ["camisa masculina", "camiseta masculina", "barbeador", "carteira masculina", "bermuda masculina", "sapato masculino"],
-        "ELETRONICOS": ["fone", "bluetooth", "celular", "carregador", "smartwatch", "tv", "notebook", "xiaomi", "cabo usb"]
+        "BEBE_INFANTIL": [
+            "fralda", "bebê", "bebe", "infantil",
+            "mamadeira", "chocalho", "carrinho de bebê",
+            "body infantil", "brinquedo infantil"
+        ],
+        "AUTOMOTIVO": [
+            "carro", "moto", "pneu", "capacete",
+            "óleo automotivo", "oleo automotivo",
+            "automotivo", "led para carro",
+            "suporte celular carro", "suporte veicular",
+            "amortecedor", "porta malas",
+            "tampa traseira"
+        ],
+        "MODA_FEMININA": [
+            "vestido", "saia", "blusa feminina",
+            "sutiã", "lingerie", "bolsa feminina",
+            "salto", "saltos", "maquiagem"
+        ],
+        "MODA_MASCULINA": [
+            "camisa masculina", "camiseta masculina",
+            "barbeador", "carteira masculina",
+            "bermuda masculina", "sapato masculino"
+        ],
+        "ELETRONICOS": [
+            "fone", "fone bluetooth", "bluetooth",
+            "celular", "carregador", "smartwatch",
+            "smart watch", "tv", "televisão",
+            "notebook", "xiaomi", "cabo usb",
+            "cabo tipo c", "cabo usb-c",
+            "tablet", "mouse", "teclado",
+            "caixa de som", "headset"
+        ]
     }
+
     for cat, termos in keywords.items():
         if any(termo in texto_lower for termo in termos):
             return cat
+
     return "PROMONOMIA_OFERTAS"
 
 def classificar_promocao(texto_post):
+    """
+    Gemini é o classificador principal.
+    As palavras-chave são utilizadas somente como fallback.
+    """
     if GEMINI_API_KEY:
         try:
             client = genai.Client(api_key=GEMINI_API_KEY)
             prompt = f"""
-            Sua tarefa é analisar o texto de uma promoção e classificá-lo estritamente em UMA destas 5 categorias específicas:
-            - BEBE_INFANTIL
-            - AUTOMOTIVO
-            - MODA_FEMININA
-            - MODA_MASCULINA
-            - ELETRONICOS
+Você é o classificador oficial das páginas PromoMania.
 
-            Regras:
-            - Se o produto for de utilidades domésticas, cozinha (como potes, talheres, escorredores), casa, ou qualquer coisa que não se encaixe perfeitamente nas 5 categorias acima, responda APENAS com: OUTROS.
-            - Se for uma das 5 categorias, responda APENAS com o nome exato dela em letras maiúsculas.
-            - Não adicione explicações, pontuação ou texto adicional.
+Analise cuidadosamente o PRODUTO anunciado no texto abaixo.
 
-            Texto da promoção:
-            \"\"\"{texto_post}\"\"\"
-            """
-            modelos = ['gemini-3.6-flash', 'gemini-3.5-flash']
+Você deve escolher EXATAMENTE UMA destas categorias:
+
+BEBE_INFANTIL
+AUTOMOTIVO
+MODA_FEMININA
+MODA_MASCULINA
+ELETRONICOS
+OUTROS
+
+REGRAS IMPORTANTES:
+
+1. Classifique pelo produto, sua finalidade e seu contexto completo.
+2. NÃO classifique simplesmente porque uma palavra-chave aparece no texto.
+3. Só escolha uma das 5 categorias específicas quando o produto pertencer claramente a ela.
+4. Se o produto for de CASA, COZINHA, UTILIDADES DOMÉSTICAS, LIMPEZA,
+   ORGANIZAÇÃO, DECORAÇÃO ou qualquer outra área que não esteja entre
+   as 5 categorias específicas, responda OUTROS.
+5. Potes, escorredores, panelas, talheres, pratos, utensílios de cozinha,
+   organizadores domésticos e produtos semelhantes são OUTROS.
+6. Se houver dúvida razoável entre duas categorias, responda OUTROS.
+7. NÃO tente encaixar um produto em uma categoria apenas para evitar OUTROS.
+8. OUTROS significa que o produto deve ser enviado para PromoManiaOfertas.
+9. Analise o produto principal anunciado, e não acessórios ou palavras
+   secundárias presentes na descrição.
+10. Responda SOMENTE com uma das 6 opções abaixo, sem explicação:
+
+BEBE_INFANTIL
+AUTOMOTIVO
+MODA_FEMININA
+MODA_MASCULINA
+ELETRONICOS
+OUTROS
+
+TEXTO DA PROMOÇÃO:
+\"\"\"{texto_post}\"\"\"
+"""
+            modelos = [
+                "gemini-3.6-flash",
+                "gemini-3.5-flash"
+            ]
+
             for modelo in modelos:
                 try:
                     response = client.models.generate_content(
                         model=modelo,
                         contents=prompt,
-                        config={"automatic_function_calling": {"disable": True}}
+                        config={
+                            "automatic_function_calling": {
+                                "disable": True
+                            }
+                        }
                     )
+
                     categoria = response.text.strip().upper()
-                    if categoria in PAGINAS_DESTINO:
-                        return categoria
-                    elif categoria == "OUTROS":
+                    categoria = categoria.replace(".", "").replace(":", "").strip()
+
+                    categorias_validas = {
+                        "BEBE_INFANTIL",
+                        "AUTOMOTIVO",
+                        "MODA_FEMININA",
+                        "MODA_MASCULINA",
+                        "ELETRONICOS",
+                        "OUTROS"
+                    }
+
+                    if categoria == "OUTROS":
                         return "PROMONOMIA_OFERTAS"
+
+                    if categoria in categorias_validas:
+                        return categoria
+
                 except Exception as e:
                     print(f"[IA AVISO] Erro no modelo {modelo}: {e}")
+
         except Exception as e:
             print(f"[IA AVISO] Falha ao inicializar o cliente Gemini: {e}")
 
@@ -160,7 +264,6 @@ def executar_bot():
 
     print(f"🔍 Encontrados {len(novos_posts)} novos produtos para processar.")
     
-    houve_atualizacao = False
     for post in reversed(novos_posts):
         post_id = post["id"]
         mensagem = post.get("message", "")
@@ -173,18 +276,13 @@ def executar_bot():
                 sucesso = republicar_para_destino(post, categoria)
                 if sucesso:
                     salvar_no_historico(post_id)
-                    houve_atualizacao = True
             else:
                 print("⚠️ Post sem categoria válida. Registrando no histórico.")
                 salvar_no_historico(post_id)
-                houve_atualizacao = True
         else:
             salvar_no_historico(post_id)
-            houve_atualizacao = True
         
         time.sleep(5)
-        
-    return houve_atualizacao
 
 if __name__ == "__main__":
     executar_bot()
