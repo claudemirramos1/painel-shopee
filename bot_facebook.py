@@ -28,6 +28,10 @@ PAGINAS_DESTINO = {
     "ELETRONICOS": {
         "id": "1330088230179474",
         "token": "EAAPFihJ9FJcBSbcBsbl9WoqGztGBiGaJi9ORgJmUMoLpZCGD5BFp2qbZA3mC1kcyZCJVQ32ldZCLYACpQ5DSuh4mmKdWtOAdUuRzoImnbooiSVS3t56EnY9jqdguUlN6TQlNPq9kL4RU3OoEBR5zP0JUg9Uu4BkSgcYRQtmRqLg3Tb0z9d2ZBhLfUfZAHGvR6PpFr9mZCk6"
+    },
+    "PROMONOMIA_OFERTAS": {
+        "id": "1214303865109377",
+        "token": "EAAPFihJ9FJcBSWSZBdne8dP0ngvvIbl91jPCzrVi7Ub7HdOIMK6guYcr3ZAA58x2ppYVZBSuwZC9IMx1wMPpBKyAtTkSz5uqi8O4B6VCGKa943WRBVclQNizD2gbKUkckX5TIU3KonoYk7ecTwTpuZARrXd5m1ur14hxYf5qGjNYOw8L53ELcVqdCPr5jFeZCfC7w1dZAst"
     }
 }
 
@@ -55,14 +59,14 @@ def classificar_por_palavras_chave(texto):
     for cat, termos in keywords.items():
         if any(termo in texto_lower for termo in termos):
             return cat
-    return None
+    return "PROMONOMIA_OFERTAS"
 
 def classificar_promocao(texto_post):
     if GEMINI_API_KEY:
         try:
             client = genai.Client(api_key=GEMINI_API_KEY)
             prompt = f"""
-            Sua tarefa é analisar o texto de uma promoção e classificá-lo estritamente em UMA destas 5 categorias:
+            Sua tarefa é analisar o texto de uma promoção e classificá-lo estritamente em UMA destas 5 categorias específicas:
             - BEBE_INFANTIL
             - AUTOMOTIVO
             - MODA_FEMININA
@@ -70,7 +74,8 @@ def classificar_promocao(texto_post):
             - ELETRONICOS
 
             Regras:
-            - Responda APENAS com o nome da categoria exata em letras maiúsculas.
+            - Se o produto for de utilidades domésticas, cozinha (como potes, talheres, escorredores), casa, ou qualquer coisa que não se encaixe perfeitamente nas 5 categorias acima, responda APENAS com: OUTROS.
+            - Se for uma das 5 categorias, responda APENAS com o nome exato dela em letras maiúsculas.
             - Não adicione explicações, pontuação ou texto adicional.
 
             Texto da promoção:
@@ -87,6 +92,8 @@ def classificar_promocao(texto_post):
                     categoria = response.text.strip().upper()
                     if categoria in PAGINAS_DESTINO:
                         return categoria
+                    elif categoria == "OUTROS":
+                        return "PROMONOMIA_OFERTAS"
                 except Exception as e:
                     print(f"[IA AVISO] Erro no modelo {modelo}: {e}")
         except Exception as e:
