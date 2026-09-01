@@ -1,4 +1,3 @@
-cat << 'EOF' > app.py
 import os
 import json
 import time
@@ -397,4 +396,3 @@ with aba_auto:
             else:
                 st.error(f"Erro: {log}. Tentando em 30s...")
                 time.sleep(30)
-                st.rerun()
