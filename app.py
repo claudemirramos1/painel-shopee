@@ -275,11 +275,19 @@ with aba_gerador:
         const extractedLink = linkMatch ? linkMatch[0].replace(/[.,!?;:)\\]}]+$/, "") : "";
         document.getElementById("productLink").value = extractedLink;
 
-        let description = `${template.header}\n\n`;
+        let description = "";
         if (extractedLink) {
-            description += `🔗 ${extractedLink} 👈🏻\n\n`;
+            description += `👉🏻 ${extractedLink} 🔗
+
+`;
         }
-        description += `${template.body}\n\n💰 Aproveite e confira a oferta!\n🔗 Ou digite o código ${code} no link da bio.\n`;
+        description += `${template.header}
+
+${template.body}
+
+💰 Aproveite e confira a oferta!
+🔗 Ou digite o código ${code} no link da bio.
+`;
 
         document.getElementById("uniqueCode").innerText = code;
         document.getElementById("postText").innerText = description;
