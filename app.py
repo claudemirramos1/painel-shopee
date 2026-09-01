@@ -287,7 +287,11 @@ ${template.body}
 
 💰 Aproveite e confira a oferta!
 🔗 Ou digite o código ${code} no link da bio.
+
 `;
+        
+        let tagsDinamicas = template.tags.join(" ");
+        description += `${tagsDinamicas} #achadinhosimperdíveis #ofertas #fyp #viral`;
 
         document.getElementById("uniqueCode").innerText = code;
         document.getElementById("postText").innerText = description;
