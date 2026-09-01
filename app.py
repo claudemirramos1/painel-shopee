@@ -264,18 +264,26 @@ with aba_gerador:
         return (chars.charAt(Math.floor(Math.random() * chars.length)) + now).slice(0, 4);
     }
     function generateContent() {
-        const rawInput = document.getElementById('productName').value.trim();
-        if (!rawInput) { alert('Por favor, digite ou cole o nome do produto!'); return; }
+        const rawInput = document.getElementById("productName").value.trim();
+        if (!rawInput) { alert("Por favor, digite ou cole o nome do produto!"); return; }
         const cleanTitle = cleanProductName(rawInput);
         const category = detectCategory(cleanTitle);
         const template = categoryTemplates[category];
         const code = generateShortCode();
-        const description = `${template.header}\n\nA ${cleanTitle} é ${template.body}\n\n💰 Aproveite e confira a oferta!\n🔗 Digite o código no link da bio.\n`;
-        document.getElementById('uniqueCode').innerText = code;
-        document.getElementById('postText').innerText = description;
+
         const linkMatch = rawInput.match(/https?:\/\/(?:s\.shopee\.com\.br|shopee\.com\.br|www\.shopee\.com\.br)\/\S+/i);
-        document.getElementById('productLink').value = linkMatch ? linkMatch[0].replace(/[.,!?;:)\\]}]+$/, '') : '';
-        document.getElementById('output').style.display = 'block';
+        const extractedLink = linkMatch ? linkMatch[0].replace(/[.,!?;:)\\]}]+$/, "") : "";
+        document.getElementById("productLink").value = extractedLink;
+
+        let description = `${template.header}\n\n`;
+        if (extractedLink) {
+            description += `🔗 ${extractedLink} 👈🏻\n\n`;
+        }
+        description += `${template.body}\n\n💰 Aproveite e confira a oferta!\n🔗 Ou digite o código ${code} no link da bio.\n`;
+
+        document.getElementById("uniqueCode").innerText = code;
+        document.getElementById("postText").innerText = description;
+        document.getElementById("output").style.display = "block";
     }
     function copyCode() { navigator.clipboard.writeText(document.getElementById('uniqueCode').innerText); alert('Código copiado!'); }
     function copyPost() { navigator.clipboard.writeText(document.getElementById('postText').innerText); alert('Texto completo copiado!'); }
