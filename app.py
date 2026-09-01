@@ -145,7 +145,6 @@ def enviar_telegram_com_foto(texto, imagens_ref):
             return r.json().get("ok", False), r.text
     except Exception as e:
         return False, str(e)
-EOF
 
 def enviar_facebook_com_foto(texto, link, imagem_ref):
     try:
