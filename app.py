@@ -395,4 +395,3 @@ with aba_auto:
                 st.rerun()
             else:
                 st.error(f"Erro: {log}. Tentando em 30s...")
-                time.sleep(30)
