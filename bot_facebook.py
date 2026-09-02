@@ -264,6 +264,8 @@ def executar_bot():
 
     print(f"🔍 Encontrados {len(novos_posts)} novos produtos para processar.")
     
+    # Processa estritamente apenas 1 item por ciclo para evitar cota esgotada
+    novos_posts = novos_posts[:1]
     for post in reversed(novos_posts):
         post_id = post["id"]
         mensagem = post.get("message", "")
