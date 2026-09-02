@@ -35,4 +35,5 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add posts_processados.txt
           git diff --staged --quiet || git commit -m "Auto: atualiza historico de posts processados"
-          git push
+          git pull origin main --rebase || true
+      git push
