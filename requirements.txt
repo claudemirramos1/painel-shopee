@@ -1,3 +1,8 @@
 google-genai
 requests
 \nyt-dlp\n
+streamlit
+streamlit-drawable-canvas
+supabase
+requests
+pillow
