@@ -31,9 +31,13 @@ jobs:
 
       - name: Salvar histórico atualizado no GitHub
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add posts_processados.txt
-          git diff --staged --quiet || git commit -m "Auto: atualiza historico de posts processados"
-          git pull origin main --rebase || true
-      git push
+    - name: Atualiza historico de posts
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "actions@github.com"
+        git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+        git fetch origin main
+        git rebase origin/main || true
+        git add posts_processados.txt
+        git commit -m "Auto: atualiza historico de posts processados" || echo "Nada para commitar"
+        git push origin main
