@@ -1,6 +1,7 @@
 import os
 import time
 import requests
+import re
 from google import genai
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
@@ -48,124 +49,58 @@ def salvar_no_historico(post_id):
         f.write(f"{post_id}\n")
 
 def classificar_por_palavras_chave(texto):
-    """
-    Fallback caso a Gemini não esteja disponível.
-    As palavras-chave servem apenas como auxílio.
-    Se não houver correspondência clara, envia para PromoManiaOfertas.
-    """
     texto_lower = texto.lower()
 
-    palavras_outros = [
-        "pote", "potes",
-        "escorredor", "escorredor de louça", "escorredor de pratos",
-        "talheres", "garfo", "faca", "colher",
-        "prato", "panela", "frigideira", "assadeira", "forma",
-        "travessa", "copo", "taça", "jarra",
-        "ralador", "peneira", "abridor",
-        "tábua de corte", "tábua de cozinha",
-        "utensílio de cozinha", "utensilios de cozinha",
-        "organizador de cozinha",
-        "cozinha", "casa", "utilidades domésticas",
-        "limpeza", "organizador doméstico"
+    palavras_casa_cozinha = [
+        "pote", "escorredor", "louça", "talheres", "garfo", "faca", "colher",
+        "prato", "panela", "frigideira", "assadeira", "taça", "jarra",
+        "ralador", "tábua", "utensílio", "limpeza", "mop", "vassoura", "sabão"
     ]
-
-    if any(termo in texto_lower for termo in palavras_outros):
+    if any(termo in texto_lower for termo in palavras_casa_cozinha):
         return "PROMONOMIA_OFERTAS"
 
     keywords = {
-        "BEBE_INFANTIL": [
-            "fralda", "bebê", "bebe", "infantil",
-            "mamadeira", "chocalho", "carrinho de bebê",
-            "body infantil", "brinquedo infantil"
-        ],
-        "AUTOMOTIVO": [
-            "carro", "moto", "pneu", "capacete",
-            "óleo automotivo", "oleo automotivo",
-            "automotivo", "led para carro",
-            "suporte celular carro", "suporte veicular",
-            "amortecedor", "porta malas",
-            "tampa traseira"
-        ],
-        "MODA_FEMININA": [
-            "vestido", "saia", "blusa feminina",
-            "sutiã", "lingerie", "bolsa feminina",
-            "salto", "saltos", "maquiagem"
-        ],
-        "MODA_MASCULINA": [
-            "camisa masculina", "camiseta masculina",
-            "barbeador", "carteira masculina",
-            "bermuda masculina", "sapato masculino"
-        ],
-        "ELETRONICOS": [
-            "fone", "fone bluetooth", "bluetooth",
-            "celular", "carregador", "smartwatch",
-            "smart watch", "tv", "televisão",
-            "notebook", "xiaomi", "cabo usb",
-            "cabo tipo c", "cabo usb-c",
-            "tablet", "mouse", "teclado",
-            "caixa de som", "headset"
-        ]
+        "BEBE_INFANTIL": ["fralda", "mamadeira", "chocalho", "carrinho de bebê", "body infantil", "berço", "naninha"],
+        "AUTOMOTIVO": ["pneu", "capacete", "óleo automotivo", "amortecedor", "palheta", "cera automotiva", "moto"],
+        "MODA_FEMININA": ["vestido", "saia", "sutiã", "lingerie", "maquiagem", "batom", "salto alto"],
+        "MODA_MASCULINA": ["barbeador", "camisa masculina", "bermuda masculina", "sapato masculino"],
+        "ELETRONICOS": ["fone bluetooth", "smartwatch", "tv", "notebook", "tablet", "monitor", "placa de vídeo", "ssd"]
     }
 
     for cat, termos in keywords.items():
-        if any(termo in texto_lower for termo in termos):
-            return cat
+        for termo in termos:
+            if re.search(rf'\b{termo}\b', texto_lower):
+                return cat
 
     return "PROMONOMIA_OFERTAS"
 
 def classificar_promocao(texto_post):
-    """
-    Gemini é o classificador principal.
-    As palavras-chave são utilizadas somente como fallback.
-    """
     if GEMINI_API_KEY:
         try:
             client = genai.Client(api_key=GEMINI_API_KEY)
+            
             prompt = f"""
-Você é o classificador oficial das páginas PromoMania.
+Você é um classificador estrito de e-commerce. Sua função é ler a oferta e determinar a categoria do produto principal.
 
-Analise cuidadosamente o PRODUTO anunciado no texto abaixo.
+**Regras de Classificação Absolutas:**
+1. Foque EXCLUSIVAMENTE no PRODUTO QUE ESTÁ SENDO VENDIDO, não nos adjetivos ou públicos secundários.
+2. Produtos de Casa, Cozinha, Organização, Limpeza ou Ferramentas (ex: Potes, Panelas, Mop, Furadeira) NÃO pertencem às categorias específicas. Devem ser "OUTROS".
+3. Moda é estritamente roupa/acessório/beleza. "Fralda" não é moda feminina, é "BEBE_INFANTIL".
+4. Se o texto fala de um smartphone, placa-mãe ou periférico, é "ELETRONICOS".
+5. Se não for 100% óbvio que pertence a uma das 5 categorias restritas, responda "OUTROS".
 
-Você deve escolher EXATAMENTE UMA destas categorias:
+TEXTO DA OFERTA:
+"{texto_post}"
 
+Responda APENAS com UMA destas palavras-chave oficiais e nada mais:
 BEBE_INFANTIL
 AUTOMOTIVO
 MODA_FEMININA
 MODA_MASCULINA
 ELETRONICOS
 OUTROS
-
-REGRAS IMPORTANTES:
-
-1. Classifique pelo produto, sua finalidade e seu contexto completo.
-2. NÃO classifique simplesmente porque uma palavra-chave aparece no texto.
-3. Só escolha uma das 5 categorias específicas quando o produto pertencer claramente a ela.
-4. Se o produto for de CASA, COZINHA, UTILIDADES DOMÉSTICAS, LIMPEZA,
-   ORGANIZAÇÃO, DECORAÇÃO ou qualquer outra área que não esteja entre
-   as 5 categorias específicas, responda OUTROS.
-5. Potes, escorredores, panelas, talheres, pratos, utensílios de cozinha,
-   organizadores domésticos e produtos semelhantes são OUTROS.
-6. Se houver dúvida razoável entre duas categorias, responda OUTROS.
-7. NÃO tente encaixar um produto em uma categoria apenas para evitar OUTROS.
-8. OUTROS significa que o produto deve ser enviado para PromoManiaOfertas.
-9. Analise o produto principal anunciado, e não acessórios ou palavras
-   secundárias presentes na descrição.
-10. Responda SOMENTE com uma das 6 opções abaixo, sem explicação:
-
-BEBE_INFANTIL
-AUTOMOTIVO
-MODA_FEMININA
-MODA_MASCULINA
-ELETRONICOS
-OUTROS
-
-TEXTO DA PROMOÇÃO:
-\"\"\"{texto_post}\"\"\"
 """
-            modelos = [
-                "gemini-3.6-flash",
-                "gemini-3.5-flash"
-            ]
+            modelos = ["gemini-1.5-flash", "gemini-1.5-pro"]
 
             for modelo in modelos:
                 try:
@@ -173,29 +108,18 @@ TEXTO DA PROMOÇÃO:
                         model=modelo,
                         contents=prompt,
                         config={
-                            "automatic_function_calling": {
-                                "disable": True
-                            }
+                            "temperature": 0.0,
+                            "automatic_function_calling": {"disable": True}
                         }
                     )
 
-                    categoria = response.text.strip().upper()
-                    categoria = categoria.replace(".", "").replace(":", "").strip()
-
-                    categorias_validas = {
-                        "BEBE_INFANTIL",
-                        "AUTOMOTIVO",
-                        "MODA_FEMININA",
-                        "MODA_MASCULINA",
-                        "ELETRONICOS",
-                        "OUTROS"
-                    }
-
-                    if categoria == "OUTROS":
-                        return "PROMONOMIA_OFERTAS"
+                    categoria = response.text.strip().upper().replace(".", "").replace(":", "")
+                    categorias_validas = {"BEBE_INFANTIL", "AUTOMOTIVO", "MODA_FEMININA", "MODA_MASCULINA", "ELETRONICOS"}
 
                     if categoria in categorias_validas:
                         return categoria
+                    else:
+                        return "PROMONOMIA_OFERTAS"
 
                 except Exception as e:
                     print(f"[IA AVISO] Erro no modelo {modelo}: {e}")
