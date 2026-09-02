@@ -206,140 +206,83 @@ TEXTO DA PROMOÇÃO:
     return classificar_por_palavras_chave(texto_post)
 
 def buscar_posts_origem(limite=10):
-    # Busca posts gerais (texto e fotos)
-    url_posts = f"https://graph.facebook.com/v20.0/{PAGINA_ORIGEM_ID}/posts"
-    params_p = {
+    url = f"https://graph.facebook.com/v20.0/{PAGINA_ORIGEM_ID}/posts"
+    params = {
         "access_token": PAGINA_ORIGEM_TOKEN,
         "limit": limite,
-        "fields": "id,message,created_time,full_picture"
+        "fields": "id,message,full_picture,created_time"
     }
     try:
-        resp_p = requests.get(url_posts, params=params_p, timeout=10).json()
-        posts = resp_p.get("data", [])
-    except:
-        posts = []
-
-    # Busca também vídeos recentes diretamente na borda /videos para garantir captura de mídias em vídeo
-    url_vids = f"https://graph.facebook.com/v20.0/{PAGINA_ORIGEM_ID}/videos"
-    params_v = {
-        "access_token": PAGINA_ORIGEM_TOKEN,
-        "limit": limite,
-        "fields": "id,source,description,created_time"
-    }
-    try:
-        resp_v = requests.get(url_vids, params=params_v, timeout=10).json()
-        videos = resp_v.get("data", [])
-        # Normaliza o formato dos vídeos para o mesmo padrão dos posts
-        for v in videos:
-            v["message"] = v.get("description", "")
-            # Garantimos um identificador único para o vídeo
-            v["is_video_direct"] = True
-            posts.append(v)
+        resp = requests.get(url, params=params, timeout=10)
+        data = resp.json()
+        if "data" in data:
+            return data["data"]
     except Exception as e:
-        print(f"⚠️ [AVISO] Falha ao buscar borda de vídeos: {e}")
-
-    # Filtra posts indesejados como a divulgação do grupo VIP do Telegram
-    posts_filtrados = []
-    for p in posts:
-        msg = p.get("message", "")
-        if "GRUPO VIP DE OFERTAS" in msg or "t.me/" in msg:
-            continue
-        posts_filtrados.append(p)
-        
-    return posts_filtrados
+        print(f"[ERRO FACEBOOK] Falha ao buscar posts: {e}")
+    return []
 
 def republicar_para_destino(post, categoria):
     destino = PAGINAS_DESTINO.get(categoria)
     if not destino:
         return False
 
-    destino_id = destino["id"]
-    post_id = post["id"]
+    url = f"https://graph.facebook.com/v20.0/{destino['id']}/photos" if "full_picture" in post else f"https://graph.facebook.com/v20.0/{destino['id']}/feed"
     
-    # Identifica se é vídeo direto ou se possui source/anexo de vídeo
-    source_url = post.get("source")
-    
-    if source_url:
-        url = f"https://graph.facebook.com/v20.0/{destino_id}/videos"
-        payload = {
-            "access_token": destino["token"],
-            "description": post.get("message", ""),
-            "file_url": source_url
-        }
-        tipo_pub = "vídeo"
-    elif "full_picture" in post:
-        url = f"https://graph.facebook.com/v20.0/{destino_id}/photos"
-        payload = {
-            "access_token": destino["token"],
-            "message": post.get("message", ""),
-            "url": post["full_picture"]
-        }
-        tipo_pub = "foto"
-    else:
-        url = f"https://graph.facebook.com/v20.0/{destino_id}/feed"
-        payload = {
-            "access_token": destino["token"],
-            "message": post.get("message", ""),
-        }
-        tipo_pub = "texto"
+    payload = {
+        "access_token": destino["token"],
+        "message": post.get("message", "")
+    }
+    if "full_picture" in post:
+        payload["url"] = post["full_picture"]
 
     try:
-        resp = requests.post(url, data=payload, timeout=120)
+        resp = requests.post(url, data=payload, timeout=15)
         res_data = resp.json()
         if "id" in res_data:
-            print(f"✅ [SUCESSO] Post {post_id} publicado como {tipo_pub} na página {categoria}!")
-            # Salva a âncora imediatamente
-            try:
-                with open("ancora.txt", "w", encoding="utf-8") as f_anc:
-                    f_anc.write(str(post_id))
-            except Exception as ex:
-                print(f"⚠️ [AVISO] Falha ao salvar âncora: {ex}")
+            print(f"✅ [SUCESSO] Post {post['id']} publicado na página {categoria}!")
             return True
         else:
-            print(f"❌ [ERRO FB] Resposta inválida ao postar {tipo_pub}: {res_data}")
-            return False
+            print(f"❌ [ERRO FB] Resposta inválida: {res_data}")
     except Exception as e:
         print(f"❌ [ERRO FB] Falha ao republicar em {categoria}: {e}")
-        return False
+    return False
 
-
-def main():
+def executar_bot():
+    posts_processados = carregar_historico()
     print("🤖 [FILA] Buscando posts recentes e cruzando com a âncora...")
-    posts = buscar_posts_origem()
-    print(f"🔍 Encontrados {len(posts)} posts/vídeos na origem.")
     
-    # Carrega a âncora se existir
-    ancora_id = None
-    try:
-        with open("ancora.txt", "r", encoding="utf-8") as f:
-            ancora_id = f.read().strip()
-    except FileNotFoundError:
-        pass
-
-    novos_posts = []
-    for p in posts:
-        if p["id"] == ancora_id:
-            break
-        novos_posts.append(p)
-    
-    # Inverte para processar do mais antigo para o mais recente na fila
-    novos_posts.reverse()
-    
-    if not novos_posts:
-        print("📭 Nenhum post novo na fila.")
+    posts = buscar_posts_origem(limite=10)
+    if not posts:
+        print("📭 Nenhum post retornado do Facebook.")
         return
 
-    print(f"📦 Processando {len(novos_posts)} novos itens...")
-    for post in novos_posts:
-        msg = post.get("message", "")
-        # Identifica a categoria com base em palavras-chave ou define padrão
-        categoria = "PROMONOMIA_OFERTAS"
-        print(f"🎯 Categoria identificada: {categoria} para o post {post['id']}")
+    novos_posts = [p for p in posts if p["id"] not in posts_processados]
+    
+    if not novos_posts:
+        print("⏳ Nenhum produto novo pendente. A âncora está atualizada!")
+        return
+
+    print(f"🔍 Encontrados {len(novos_posts)} novos produtos para processar.")
+    
+    for post in reversed(novos_posts):
+        post_id = post["id"]
+        mensagem = post.get("message", "")
         
-        sucesso = republicar_para_destino(post, categoria)
-        if not sucesso:
-            print("⚠️ Parando o ciclo devido a um erro de publicação.")
-            break
+        if mensagem:
+            print(f"\n📦 Processando post ID: {post_id}")
+            categoria = classificar_promocao(mensagem)
+            if categoria:
+                print(f"🎯 Categoria identificada: {categoria}")
+                sucesso = republicar_para_destino(post, categoria)
+                if sucesso:
+                    salvar_no_historico(post_id)
+            else:
+                print("⚠️ Post sem categoria válida. Registrando no histórico.")
+                salvar_no_historico(post_id)
+        else:
+            salvar_no_historico(post_id)
+        
+        time.sleep(5)
 
 if __name__ == "__main__":
-    main()
+    executar_bot()
