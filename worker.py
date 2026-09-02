@@ -1,82 +1,47 @@
 import os
 import json
-import time
 import io
 import re
 import requests
 from PIL import Image, ImageOps
 
-# ==========================================
-# CREDENCIAIS FIXAS (Garante 0 erros de leitura)
-# ==========================================
 SUPABASE_URL = "https://ftumdeqziwyljmaehaqk.supabase.co"
 SUPABASE_KEY = "sb_publishable_8qfsBhW22Sx25mvPcxWNvw_4teJRbfu"
 
-# Demais variáveis puxadas com segurança
 FACEBOOK_PAGE_ID = "1214303865109377"
 FACEBOOK_ACCESS_TOKEN = "EAAPFihJ9FJcBSWSZBdne8dP0ngvvIbl91jPCzrVi7Ub7HdOIMK6guYcr3ZAA58x2ppYVZBSuwZC9IMx1wMPpBKyAtTkSz5uqi8O4B6VCGKa943WRBVclQNizD2gbKUkckX5TIU3KonoYk7ecTwTpuZARrXd5m1ur14hxYf5qGjNYOw8L53ELcVqdCPr5jFeZCfC7w1dZAst"
 TELEGRAM_CANAL_TOKEN = "8353706833:AAHhyPqgeNezFY1X4NTMegpaPf_UdVOBs04"
 TELEGRAM_CANAL_ID = "-1004406728710"
 
-INTERVALO_MINUTOS = int((os.environ.get("INTERVALO_MINUTOS") or "15").strip())
-INTERVALO_DIVULGACAO_MINUTOS = 120
-
-print("🤖 Iniciando Worker Inteligente (Com e Sem Foto)...")
-
-supabase = True
-print("✅ Supabase configurado via REST API!")
+print("🤖 Iniciando Worker Inteligente (Execução Única)...")
 
 def carregar_rascunhos():
     try:
-        url = f"{SUPABASE_URL}/rest/v1/ofertas?select=*&order=created_at.asc"
-        headers = {
-            "apikey": SUPABASE_KEY,
-            "Authorization": f"Bearer {SUPABASE_KEY}"
-        }
-
+        url = f"{SUPABASE_URL}/rest/v1/ofertas?select=*&order=created_at.asc&limit=1"
+        headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
         r = requests.get(url, headers=headers, timeout=20)
-
-        if r.status_code != 200:
-            print(f"⚠️ Erro ao buscar ofertas: {r.status_code} - {r.text}")
-            return []
-
+        if r.status_code != 200: return []
         return r.json()
-
-    except Exception as e:
-        print(f"⚠️ Erro ao buscar rascunhos: {e}")
+    except:
         return []
-
 
 def remover_rascunho(rascunho_id):
     try:
         url = f"{SUPABASE_URL}/rest/v1/ofertas?id=eq.{rascunho_id}"
-        headers = {
-            "apikey": SUPABASE_KEY,
-            "Authorization": f"Bearer {SUPABASE_KEY}"
-        }
-
-        r = requests.delete(url, headers=headers, timeout=20)
-
-        if r.status_code not in (200, 204):
-            print(f"⚠️ Erro ao remover oferta {rascunho_id}: {r.status_code} - {r.text}")
-        else:
-            print(f"🗑️ Oferta {rascunho_id} removida da fila.")
-
-    except Exception as e:
-        print(f"⚠️ Erro ao remover rascunho: {e}")
-
+        headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
+        requests.delete(url, headers=headers, timeout=20)
+        print(f"🗑️ Oferta {rascunho_id} removida da fila.")
+    except:
+        pass
 
 def extrair_dados_do_texto_bruto(texto_bruto):
-    if not texto_bruto:
-        return "Produto", "0,00", ""
+    if not texto_bruto: return "Produto", "0,00", ""
     link = ""
     match_link = re.search(r'(https?://\S+)', texto_bruto)
     if match_link: link = match_link.group(1)
-
     preco = "0,00"
     match_preco = re.search(r'R\$\s*([\d\.,]+)', texto_bruto, re.IGNORECASE)
     if match_preco: preco = match_preco.group(1)
-
     titulo = texto_bruto
     titulo = re.sub(r'Dê uma olhada em\s*', '', titulo, flags=re.IGNORECASE)
     if match_preco: titulo = re.sub(rf'por\s*R\$\s*{re.escape(preco)}.*', '', titulo, flags=re.IGNORECASE)
@@ -86,11 +51,9 @@ def extrair_dados_do_texto_bruto(texto_bruto):
     return titulo if titulo else "Oferta Imperdível", preco, link
 
 def obter_texto_anuncio(item):
-    # Se for texto de divulgação formatado, usa direto
     if item.get("formatado"):
         link = item.get("link") or ""
         return item.get("formatado"), link
-        
     texto_base = item.get("titulo") or ""
     titulo, preco, link = extrair_dados_do_texto_bruto(texto_base)
     if item.get("titulo") and "Dê uma olhada" not in item.get("titulo"): titulo = item.get("titulo")
@@ -136,21 +99,14 @@ def processar_imagem(img_url):
         return None
 
 def enviar_telegram(texto, imagens_ref):
-    if not TELEGRAM_CANAL_TOKEN or not TELEGRAM_CANAL_ID:
-        return False
+    if not TELEGRAM_CANAL_TOKEN or not TELEGRAM_CANAL_ID: return False
     try:
-        # Se NÃO houver imagem (Post de Divulgação), envia apenas mensagem de texto
         if not imagens_ref:
             url = f"https://api.telegram.org/bot{TELEGRAM_CANAL_TOKEN}/sendMessage"
-            payload = {'chat_id': TELEGRAM_CANAL_ID, 'text': texto, 'parse_mode': 'Markdown'}
-            r = requests.post(url, data=payload, timeout=30)
+            r = requests.post(url, data={'chat_id': TELEGRAM_CANAL_ID, 'text': texto, 'parse_mode': 'Markdown'}, timeout=30)
             return r.json().get("ok", False)
-
-        # Se TIVER imagem (Oferta Normal)
         if isinstance(imagens_ref, str): imagens_ref = [imagens_ref]
-        midia_processada = []
-        files_dict = {}
-
+        midia_processada, files_dict = [], {}
         for i, img_url in enumerate(imagens_ref):
             img_io = processar_imagem(img_url)
             if img_io:
@@ -161,7 +117,6 @@ def enviar_telegram(texto, imagens_ref):
                     item_midia["caption"] = texto
                     item_midia["parse_mode"] = "Markdown"
                 midia_processada.append(item_midia)
-
         if len(midia_processada) > 1:
             url = f"https://api.telegram.org/bot{TELEGRAM_CANAL_TOKEN}/sendMediaGroup"
             r = requests.post(url, data={'chat_id': TELEGRAM_CANAL_ID, 'media': json.dumps(midia_processada)}, files=files_dict, timeout=40)
@@ -171,17 +126,13 @@ def enviar_telegram(texto, imagens_ref):
             r = requests.post(url, data={'chat_id': TELEGRAM_CANAL_ID, 'caption': texto, 'parse_mode': 'Markdown'}, files={'photo': files_dict['photo_0']}, timeout=30)
             return r.json().get("ok", False)
         return False
-    except Exception as e:
-        print(f"⚠️ Erro no Telegram: {e}")
+    except:
         return False
 
 def enviar_facebook(texto, link, imagem_url=None):
-    if not FACEBOOK_PAGE_ID or not FACEBOOK_ACCESS_TOKEN:
-        return False
+    if not FACEBOOK_PAGE_ID or not FACEBOOK_ACCESS_TOKEN: return False
     try:
         legenda = texto.replace("**", "*")
-        
-        # Se tiver imagem, envia para /photos com a foto anexada
         if imagem_url:
             img_io = processar_imagem(imagem_url)
             if img_io:
@@ -189,221 +140,28 @@ def enviar_facebook(texto, link, imagem_url=None):
                 url = f"https://graph.facebook.com/v19.0/{FACEBOOK_PAGE_ID}/photos"
                 r = requests.post(url, data={'caption': legenda, 'access_token': FACEBOOK_ACCESS_TOKEN}, files={'source': ('foto.jpg', img_io.getvalue(), 'image/jpeg')}, timeout=40)
                 return "id" in r.json() or "post_id" in r.json()
-        
-        # Se NÃO tiver imagem (Post de Divulgação), envia no /feed só texto e prévia do link
         url = f"https://graph.facebook.com/v19.0/{FACEBOOK_PAGE_ID}/feed"
-        payload = {'message': legenda, 'link': link, 'access_token': FACEBOOK_ACCESS_TOKEN}
-        r = requests.post(url, data=payload, timeout=30)
+        r = requests.post(url, data={'message': legenda, 'link': link, 'access_token': FACEBOOK_ACCESS_TOKEN}, timeout=30)
         return "id" in r.json()
-    except Exception as e:
-        print(f"⚠️ Erro no Facebook: {e}")
+    except:
         return False
 
+# Execução única
+rascunhos = carregar_rascunhos()
+if rascunhos:
+    proxima = rascunhos[0]
+    texto, link = obter_texto_anuncio(proxima)
+    fotos = obter_fotos_lista(proxima)
+    foto_principal = fotos[0] if fotos else None
 
-# ==========================================
-# DIVULGAÇÕES AUTOMÁTICAS
-# ==========================================
+    print(f"🚀 Publicando oferta: {proxima.get('titulo')}")
+    ok_tg = enviar_telegram(texto, fotos)
+    ok_fb = enviar_facebook(texto, link, foto_principal)
 
-def obter_numero_divulgacao():
-    try:
-        url = (
-            f"{SUPABASE_URL}/rest/v1/controle_divulgacao"
-            "?select=proxima_mensagem&limit=1"
-        )
-
-        headers = {
-            "apikey": SUPABASE_KEY,
-            "Authorization": f"Bearer {SUPABASE_KEY}"
-        }
-
-        r = requests.get(url, headers=headers, timeout=20)
-
-        if r.status_code != 200:
-            print(f"⚠️ Erro no controle: {r.status_code} - {r.text}")
-            return 1
-
-        dados = r.json()
-
-        if not dados:
-            return 1
-
-        numero = int(dados[0].get("proxima_mensagem", 1))
-
-        if numero < 1 or numero > 11:
-            numero = 1
-
-        return numero
-
-    except Exception as e:
-        print(f"⚠️ Erro ao ler controle: {e}")
-        return 1
-
-
-def buscar_proxima_divulgacao():
-    try:
-        numero = obter_numero_divulgacao()
-
-        url = (
-            f"{SUPABASE_URL}/rest/v1/mensagens_divulgacao"
-            f"?id=eq.{numero}"
-            "&select=id,mensagem,imagem"
-        )
-
-        headers = {
-            "apikey": SUPABASE_KEY,
-            "Authorization": f"Bearer {SUPABASE_KEY}"
-        }
-
-        r = requests.get(url, headers=headers, timeout=20)
-
-        if r.status_code != 200:
-            print(
-                f"⚠️ Erro ao buscar divulgação: "
-                f"{r.status_code} - {r.text}"
-            )
-            return None
-
-        dados = r.json()
-
-        if not dados:
-            print(f"⚠️ Mensagem {numero} não encontrada.")
-            return None
-
-        return dados[0]
-
-    except Exception as e:
-        print(f"⚠️ Erro ao buscar divulgação: {e}")
-        return None
-
-
-def avancar_divulgacao():
-    try:
-        atual = obter_numero_divulgacao()
-        proxima = atual + 1
-
-        if proxima > 11:
-            proxima = 1
-
-        url = (
-            f"{SUPABASE_URL}/rest/v1/controle_divulgacao"
-            f"?proxima_mensagem=eq.{atual}"
-        )
-
-        headers = {
-            "apikey": SUPABASE_KEY,
-            "Authorization": f"Bearer {SUPABASE_KEY}",
-            "Content-Type": "application/json",
-            "Prefer": "return=minimal"
-        }
-
-        r = requests.patch(
-            url,
-            headers=headers,
-            json={"proxima_mensagem": proxima},
-            timeout=20
-        )
-
-        if r.status_code not in (200, 204):
-            print(
-                f"⚠️ Erro ao avançar divulgação: "
-                f"{r.status_code} - {r.text}"
-            )
-            return False
-
-        print(f"🔄 Próxima divulgação: mensagem {proxima}")
-        return True
-
-    except Exception as e:
-        print(f"⚠️ Erro ao atualizar controle: {e}")
-        return False
-
-
-def executar_divulgacao():
-    mensagem = buscar_proxima_divulgacao()
-
-    if not mensagem:
-        return False
-
-    numero = mensagem.get("id")
-    texto = mensagem.get("mensagem") or ""
-    imagem = mensagem.get("imagem") or ""
-
-    if not texto:
-        print(f"⚠️ Divulgação {numero} está sem texto.")
-        return False
-
-    if not imagem:
-        print(f"⚠️ Divulgação {numero} está sem imagem.")
-        return False
-
-    print(f"📢 Enviando divulgação {numero}/11...")
-    print(f"🖼️ Imagem: {imagem}")
-
-    sucesso = enviar_facebook(
-        texto=texto,
-        link="",
-        imagem_url=imagem
-    )
-
-    if sucesso:
-        print(f"✅ Divulgação {numero} publicada no Facebook!")
-        avancar_divulgacao()
-        return True
-
-    print(f"❌ Falha ao publicar divulgação {numero}.")
-    return False
-
-
-# ==========================================
-# FIM DAS DIVULGAÇÕES AUTOMÁTICAS
-# ==========================================
-
-
-# Loop principal do robô
-while True:
-    try:
-        if not supabase:
-            print("⏳ Aguardando conexão válida com o Supabase...")
-            time.sleep(15)
-            continue
-
-        rascunhos = carregar_rascunhos()
-        if rascunhos:
-            proxima = rascunhos[0]
-            texto, link = obter_texto_anuncio(proxima)
-            fotos = obter_fotos_lista(proxima)
-            foto_principal = fotos[0] if fotos else None
-
-            print(f"🚀 Publicando: {proxima.get('titulo')} (Fotos encontradas: {len(fotos)})")
-            ok_tg = enviar_telegram(texto, fotos)
-            ok_fb = enviar_facebook(texto, link, foto_principal)
-
-            if ok_tg or ok_fb:
-                remover_rascunho(proxima["id"])
-                print(f"✅ Publicado com sucesso! Aguardando {INTERVALO_MINUTOS} min para o próximo...")
-            else:
-                print("❌ Erro ao disparar nas redes. Tentando novamente em 1 minuto...")
-                time.sleep(60)
-                continue
-        else:
-            print("📭 Fila de ofertas vazia.")
-            print("📢 Verificando próxima mensagem de divulgação...")
-
-            ok_divulgacao = executar_divulgacao()
-
-            if ok_divulgacao:
-                print(
-                    f"✅ Divulgação enviada. "
-                    f"Aguardando {INTERVALO_DIVULGACAO_MINUTOS} min para o próximo ciclo..."
-                )
-                time.sleep(INTERVALO_DIVULGACAO_MINUTOS * 60)
-            else:
-                print("⚠️ Nenhuma divulgação enviada. Tentando novamente em 30 segundos...")
-                time.sleep(30)
-
-            continue
-        
-        time.sleep(INTERVALO_MINUTOS * 60)
-    except Exception as e:
-        print(f"⚠️ Erro no loop geral: {e}")
-        time.sleep(30)
+    if ok_tg or ok_fb:
+        remover_rascunho(proxima["id"])
+        print("✅ Oferta publicada e removida com sucesso!")
+    else:
+        print("❌ Falha ao publicar oferta.")
+else:
+    print("📭 Fila de ofertas vazia.")
