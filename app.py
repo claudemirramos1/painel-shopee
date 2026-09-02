@@ -304,7 +304,7 @@ with aba_gerador:
 ${cleanTitle}! 😍
 
 `;
-        description += `💰 **VALOR: ${precoStr}** (bem destacado)
+        description += `💰 **VALOR: ${precoStr}**
 
 `;
         description += `💰 Aproveite e confira a oferta!
