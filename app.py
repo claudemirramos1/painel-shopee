@@ -295,17 +295,25 @@ with aba_gerador:
 
 `;
         }
+        
+        let precoMatch = rawInput.match(/R\$\s*([\d\.,]+)/i);
+        let precoStr = precoMatch ? precoMatch[0] : "R$ 0,00";
+
         description += `${template.header}
 
-${template.body}
+${cleanTitle}! 😍
 
-💰 Aproveite e confira a oferta!
+`;
+        description += `💰 **VALOR: ${precoStr}** (bem destacado)
+
+`;
+        description += `💰 Aproveite e confira a oferta!
 🔗 Ou digite o código ${code} no link da bio.
 
 `;
         
-        let tagsDinamicas = template.tags.join(" ");
-        description += `${tagsDinamicas} #achadinhosimperdíveis #ofertas #fyp #viral`;
+        let tagProd = template.tags.length > 0 ? template.tags[0] : "#Utensilios";
+        description += `#CozinhaPratica #DicasDeCozinha ${tagProd} #achadinhosimperdíveis #ofertas`;
 
         document.getElementById("uniqueCode").innerText = code;
         document.getElementById("postText").innerText = description;
