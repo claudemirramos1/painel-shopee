@@ -210,7 +210,7 @@ def buscar_posts_origem(limite=10):
     params = {
         "access_token": PAGINA_ORIGEM_TOKEN,
         "limit": limite,
-        "fields": "id,message,full_picture,created_time"
+        "fields": "id,message,full_picture,created_time,source,attachments"
     }
     try:
         resp = requests.get(url, params=params, timeout=10)
@@ -226,14 +226,27 @@ def republicar_para_destino(post, categoria):
     if not destino:
         return False
 
-    url = f"https://graph.facebook.com/v20.0/{destino['id']}/photos" if "full_picture" in post else f"https://graph.facebook.com/v20.0/{destino['id']}/feed"
-    
-    payload = {
-        "access_token": destino["token"],
-        "message": post.get("message", "")
-    }
-    if "full_picture" in post:
-        payload["url"] = post["full_picture"]
+    is_video = "source" in post or (post.get("attachments", {}).get("data", [{}])[0].get("type") == "video")
+    if is_video and "source" in post:
+        url = f"https://graph.facebook.com/v20.0/{destino['id']}/videos"
+        payload = {
+            "access_token": destino["token"],
+            "description": post.get("message", ""),
+            "file_url": post["source"]
+        }
+    elif "full_picture" in post:
+        url = f"https://graph.facebook.com/v20.0/{destino['id']}/photos"
+        payload = {
+            "access_token": destino["token"],
+            "message": post.get("message", ""),
+            "url": post["full_picture"]
+        }
+    else:
+        url = f"https://graph.facebook.com/v20.0/{destino['id']}/feed"
+        payload = {
+            "access_token": destino["token"],
+            "message": post.get("message", ""),
+        }
 
     try:
         resp = requests.post(url, data=payload, timeout=15)
