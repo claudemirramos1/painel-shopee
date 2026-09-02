@@ -251,7 +251,7 @@ def executar_bot():
     posts_processados = carregar_historico()
     print("🤖 [FILA] Buscando posts recentes e cruzando com a âncora...")
     
-    posts = buscar_posts_origem(limite=10)
+    posts = buscar_posts_origem(limite=1)
     if not posts:
         print("📭 Nenhum post retornado do Facebook.")
         return
