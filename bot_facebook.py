@@ -100,7 +100,7 @@ MODA_MASCULINA
 ELETRONICOS
 OUTROS
 """
-            modelos = ["gemini-3.6-flash", "gemini-3.1-pro-preview"]
+            modelos = ["gemini-3.6-flash"]
 
             for modelo in modelos:
                 try:
