@@ -414,3 +414,37 @@ with aba_auto:
                 st.rerun()
             else:
                 st.error(f"Erro: {log}. Tentando em 30s...")
+
+def formatar_texto_anuncio(texto_bruto):
+    if not texto_bruto:
+        return "Oferta Imperdível", "0,00", "", ""
+    
+    import re
+    link = ""
+    match_link = re.search(r"(https?://\S+)", texto_bruto)
+    if match_link:
+        link = match_link.group(1)
+        
+    preco = "0,00"
+    match_preco = re.search(r"R\$\s*([\d\.,]+)", texto_bruto, re.IGNORECASE)
+    if match_preco:
+        preco = match_preco.group(1)
+        
+    titulo = texto_bruto
+    if match_link:
+        titulo = titulo.replace(link, "")
+    titulo = re.sub(r"R\$\s*[\d\.,]+", "", titulo, flags=re.IGNORECASE)
+    titulo = re.sub(r"\s+", " ", titulo).strip()
+    
+    if not titulo:
+        titulo = "Oferta Imperdível"
+
+    texto_formatado = (
+        f"⚡ **OFERTA IMPERDÍVEL!**\n\n"
+        f"🔥 **{titulo}**\n\n"
+        f"✅ **Por:** R$ {preco}\n\n"
+        f"👇 **Garantia de menor preço no link abaixo**\n\n"
+        f"🔗 {link}"
+    )
+    
+    return texto_formatado, titulo, preco, link
