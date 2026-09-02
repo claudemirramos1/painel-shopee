@@ -415,36 +415,54 @@ with aba_auto:
             else:
                 st.error(f"Erro: {log}. Tentando em 30s...")
 
+
 def formatar_texto_anuncio(texto_bruto):
     if not texto_bruto:
         return "Oferta Imperdível", "0,00", "", ""
     
     import re
+    
+    # Extrai o link
     link = ""
     match_link = re.search(r"(https?://\S+)", texto_bruto)
     if match_link:
         link = match_link.group(1)
         
+    # Extrai o preço
     preco = "0,00"
     match_preco = re.search(r"R\$\s*([\d\.,]+)", texto_bruto, re.IGNORECASE)
     if match_preco:
         preco = match_preco.group(1)
         
+    # Limpa o título
     titulo = texto_bruto
     if match_link:
         titulo = titulo.replace(link, "")
-    titulo = re.sub(r"R\$\s*[\d\.,]+", "", titulo, flags=re.IGNORECASE)
+    titulo = re.sub(r"Dê uma olhada em\s*", "", titulo, flags=re.IGNORECASE)
+    if match_preco:
+        titulo = re.sub(rf"por\s*R\$\s*{re.escape(preco)}.*", "", titulo, flags=re.IGNORECASE)
+        titulo = re.sub(rf"R\$\s*{re.escape(preco)}", "", titulo, flags=re.IGNORECASE)
+    titulo = titulo.replace("Compre na Shopee agora!", "").strip()
     titulo = re.sub(r"\s+", " ", titulo).strip()
     
     if not titulo:
         titulo = "Oferta Imperdível"
 
+    # Gera 1 hashtag baseada no título (ex: CortadorDeLegumes)
+    palavras = re.findall(r"\w+", titulo)
+    palavras_filtradas = [p.capitalize() for p in palavras if len(p) > 3 and p.lower() not in ["para", "com", "uma", "dos", "das"]]
+    hashtag_produto = "".join(palavras_filtradas[:2]) if palavras_filtradas else "Utensilios"
+    if not hashtag_produto:
+        hashtag_produto = "Achadinho"
+
+    # Monta exatamente no padrão que você pediu
     texto_formatado = (
-        f"⚡ **OFERTA IMPERDÍVEL!**\n\n"
-        f"🔥 **{titulo}**\n\n"
-        f"✅ **Por:** R$ {preco}\n\n"
-        f"👇 **Garantia de menor preço no link abaixo**\n\n"
-        f"🔗 {link}"
+        f"👉🏻 {link} 🔗\n\n"
+        f"🍳✨ **{titulo}**! 😍\n\n"
+        f"💰 **VALOR: R$ {preco}** (bem destacado)\n\n"
+        f"💰 Aproveite e confira a oferta!\n"
+        f"🔗 Ou digite o código no link da bio.\n\n"
+        f"#CozinhaPratica #DicasDeCozinha #{hashtag_produto} #achadinhosimperdíveis #ofertas #fyp #viral"
     )
     
     return texto_formatado, titulo, preco, link
