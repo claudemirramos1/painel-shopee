@@ -251,7 +251,7 @@ def executar_bot():
     posts_processados = carregar_historico()
     print("🤖 [FILA] Buscando posts recentes e cruzando com a âncora...")
     
-    posts = buscar_posts_origem(limite=1)
+    posts = buscar_posts_origem(limite=25)
     if not posts:
         print("📭 Nenhum post retornado do Facebook.")
         return
@@ -265,7 +265,7 @@ def executar_bot():
     print(f"🔍 Encontrados {len(novos_posts)} novos produtos para processar.")
     
     # Processa estritamente apenas 1 item por ciclo para evitar cota esgotada
-    novos_posts = novos_posts[:1]
+    novos_posts = [novos_posts[-1]] if novos_posts else []
     for post in reversed(novos_posts):
         post_id = post["id"]
         mensagem = post.get("message", "")
