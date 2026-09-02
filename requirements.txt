@@ -1,5 +1,4 @@
 google-genai
-stregoogle-genai
 streamlit
 streamlit-drawable-canvas
 supabase
