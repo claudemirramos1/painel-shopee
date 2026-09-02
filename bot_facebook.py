@@ -205,7 +205,7 @@ TEXTO DA PROMOÇÃO:
 
     return classificar_por_palavras_chave(texto_post)
 
-def buscar_posts_origem(limite=10):
+def buscar_posts_origem(limite=1):
     url = f"https://graph.facebook.com/v20.0/{PAGINA_ORIGEM_ID}/posts"
     params = {
         "access_token": PAGINA_ORIGEM_TOKEN,
@@ -251,7 +251,7 @@ def executar_bot():
     posts_processados = carregar_historico()
     print("🤖 [FILA] Buscando posts recentes e cruzando com a âncora...")
     
-    posts = buscar_posts_origem(limite=10)
+    posts = buscar_posts_origem(limite=1)
     if not posts:
         print("📭 Nenhum post retornado do Facebook.")
         return
