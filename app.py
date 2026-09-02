@@ -63,7 +63,21 @@ def obter_texto_anuncio(item):
     if item.get("titulo") and "Dê uma olhada" not in str(item.get("titulo")): titulo = item.get("titulo")
     if item.get("preco"): preco = item.get("preco")
     if item.get("link"): link = item.get("link")
-    return f"⚡ **OFERTA IMPERDÍVEL!**\n\n🔥 **{titulo}**\n\n✅ **Por:** R$ {preco}\n\n👇 **Garantia de menor preço no link abaixo**\n\n🔗 {link}", link
+    
+    import re
+    palavras = re.findall(r"\w+", titulo)
+    palavras_filtradas = [p.capitalize() for p in palavras if len(p) > 3 and p.lower() not in ["para", "com", "uma", "dos", "das"]]
+    hashtag_produto = palavras_filtradas[0] if palavras_filtradas else "Utensilios"
+
+    texto_formatado = (
+        f"👉🏻 {link} 🔗\n\n"
+        f"🍳✨ **{titulo}**! 😍\n\n"
+        f"💰 **VALOR: R$ {preco}** (bem destacado)\n\n"
+        f"💰 Aproveite e confira a oferta!\n"
+        f"🔗 Ou digite o código no link da bio.\n\n"
+        f"#CozinhaPratica #DicasDeCozinha #{hashtag_produto} #achadinhosimperdíveis #ofertas"
+    )
+    return texto_formatado, link
 
 def obter_fotos_lista(item):
     val = item.get("fotos") or item.get("imagem") or item.get("foto") or item.get("img") or item.get("image")
