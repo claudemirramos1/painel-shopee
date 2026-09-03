@@ -294,6 +294,7 @@ function cleanProductName(input) {
     title = title.replace(/com\s+\d+%\s+de\s+desconto.*/i, "");
     title = title.replace(/compre na shopee agora!?/gi, "");
     title = title.replace(/^confira\s+/i, "");
+        title = title.replace(/^dê uma olhada em\s*/i, "");
     title = title.replace(/!+\s*😍?/g, "");
     title = title.replace(/\s+/g, " ").trim();
 
@@ -433,9 +434,10 @@ function generateContent() {
     description += `${header}\n\n`;
     description += `Dê uma olhada em ${cleanTitle}\n\n`;
     description += `🛒COMPRE AGORA!\n\n`;
-    description += `**VALOR: R$ ${precoStr}**\n\n`;
+    description += `🔥💰 **VALOR: R$ ${precoStr}** 🔥\n\n`;
     description += `💰 Aproveite e confira a oferta!\n`;
-    description += `Ou digite o código ${code} no link da bio.\n\n`;
+    description += `🎟️🔥 **CÓDIGO: ${code}** 🔥\n`;
+    description += `👉🏻 Digite o código no link da bio.\n\n`;
     description += `${hashtagsProduto[0]} ${hashtagsProduto[1]} `;
     description += `#achadinhosimperdíveis #ofertas #shopee`;
 
