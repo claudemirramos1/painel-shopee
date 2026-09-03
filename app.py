@@ -326,6 +326,140 @@ with aba_gerador:
     """
     components.html(html_gerador, height=650, scrolling=True)
 
+with aba_gerador:
+    st.subheader("Gerador de Divulgação Inteligente")
+    st.caption("Esta é a interface do seu arquivo HTML incorporada diretamente no Streamlit, mantendo o envio integrado para a sua planilha via Web App.")
+
+    html_gerador = """
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+        <meta charset="UTF-8">
+        <style>
+            * { box-sizing: border-box; }
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 10px; background-color: #f0f2f5; color: #1c1e21; margin: 0; }
+            .container { background: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); max-width: 100%; margin: 0 auto; }
+            h2 { margin-top: 0; font-size: 20px; color: #111; text-align: center; }
+            label { font-weight: 600; display: block; margin-top: 15px; font-size: 14px; color: #444; }
+            input[type="text"] { width: 100%; padding: 12px; margin-top: 6px; border: 1px solid #ccc; border-radius: 8px; font-size: 15px; outline: none; }
+            input[type="text"]:focus { border-color: #007bff; }
+            button { margin-top: 18px; width: 100%; padding: 14px; background-color: #28a745; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; }
+            button:active { background-color: #218838; }
+            .result-box { margin-top: 22px; padding: 16px; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; }
+            .code-row { display: flex; align-items: center; justify-content: space-between; background: #fff3cd; padding: 10px 14px; border-radius: 6px; border: 1px solid #ffeeba; }
+            .code-highlight { font-size: 20px; font-weight: 800; color: #856404; letter-spacing: 1px; }
+            .copy-btn { padding: 6px 12px; font-size: 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; }
+            .section-title { font-weight: bold; margin-top: 15px; font-size: 14px; color: #555; }
+            pre { white-space: pre-wrap; word-wrap: break-word; font-family: inherit; font-size: 14px; line-height: 1.5; background: #ffffff; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; margin-top: 5px; }
+            .btn-copy-all { margin-top: 10px; width: 100%; padding: 10px; background-color: #007bff; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; }
+            .sheet-box { margin-top: 20px; padding: 15px; background: #e7f5ff; border: 1px solid #b3d7ff; border-radius: 8px; }
+            .btn-sheet { background-color: #17a2b8; margin-top: 10px; }
+            .btn-sheet:active { background-color: #138496; }
+        </style>
+    </head>
+    <body>
+    <div class="container">
+        <h2>✨ Gerador de Post & Código</h2>
+        <label for="productName">Cole a oferta ou nome do produto:</label>
+        <input type="text" id="productName" placeholder="Cole o título ou anúncio completo aqui">
+        <button onclick="generateContent()">Gerar Divulgação</button>
+        <div class="result-box" id="output" style="display:none;">
+            <div class="section-title">1. Código Único (Curto):</div>
+            <div class="code-row">
+                <span class="code-highlight" id="uniqueCode"></span>
+                <button class="copy-btn" onclick="copyCode()">Copiar Código</button>
+            </div>
+            <div class="section-title">2. Texto Completo para o Post:</div>
+            <pre id="postText"></pre>
+            <button class="btn-copy-all" onclick="copyPost()">Copiar Texto Completo</button>
+            <div class="sheet-box">
+                <div class="section-title" style="margin-top:0;">3. Salvar na Planilha:</div>
+                <label for="productLink" style="margin-top:5px;">Link do Produto / Afiliado:</label>
+                <input type="text" id="productLink" placeholder="https://shopee.com.br/...">
+                <button class="btn-sheet" onclick="sendToSheet()">📊 Salvar Código e Link na Planilha</button>
+            </div>
+        </div>
+    </div>
+    <script>
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzzhTgatVKIUrpE6wVUSYfivNjuJ99RLfuRvISQX1PPZhCypcByxzXcac-bx2y0hg/exec";
+    const categoryTemplates = {
+        cafe: { header: "☕✨ Café fresquinho de um jeito prático!", body: "Perfeito para preparar seu café ou chá onde estiver. Compacto, fácil de usar e sem complicação! 😍", tags: ['#Cafe', '#CafeEmCasa', '#HoraDoCafe'] },
+        infantil: { header: "🚲💖 Diversão garantida para a criançada!", body: "Perfeita para os primeiros passos e momentos inesquecíveis. Super segura, confortável e estilosa! 😍", tags: ['#MundoInfantil', '#Brinquedos', '#Kids'] },
+        cozinha: { header: "🍳✨ Praticidade total na sua cozinha!", body: "O item que faltava para facilitar a sua rotina diária com muito mais eficiência e estilo! 😍", tags: ['#CozinhaPratica', '#DicasDeCozinha', '#Utensilios'] },
+        beleza: { header: "✨💖 Seu momento de autocuidado ainda melhor!", body: "Ideal para manter sua rotina de beleza impecável todos os dias com facilidade! 😍", tags: ['#Beleza', '#Skincare', '#AutoCuidado'] },
+        tecnologia: { header: "⚡🔌 Praticidade e tecnologia no seu dia a dia!", body: "Mais facilidade e eficiência para a sua rotina com qualidade surpreendente! 😍", tags: ['#Tecnologia', '#Gadgets', '#SmartHome'] },
+        casa: { header: "🏠✨ Sua casa ainda mais prática e bonita!", body: "Um item essencial para facilitar a organização e o dia a dia do seu lar! 😍", tags: ['#CasaEOrganizacao', '#Utilidades', '#DicasParaCasa'] },
+        geral: { header: "🔥✨ Olha esse achadinho incrível!", body: "Perfeito para facilitar sua rotina com muita praticidade e qualidade! 😍", tags: ['#Achadinhos', '#Shopee', '#Promoção'] }
+    };
+    const stopWords = ['confira', 'com', 'para', 'rosa', 'azul', 'preto', 'verde', 'amarelo', 'aro', 'desconto', 'somente', 'freio', 'tambor', 'rodas', 'treinamento', 'bicicleta', 'infantil', 'nathor', 'charm'];
+    function cleanProductName(input) {
+        return input.replace(/^confira\s+/i, '').replace(/com\s+\d+%\s+de\s+desconto.*/i, '').replace(/somente\s+r\$\s*[\d.,]+/i, '').trim();
+    }
+    function detectCategory(title) {
+        const t = title.toLowerCase();
+        if (t.includes('café') || t.includes('cafe') || t.includes('coador') || t.includes('xícara')) return 'cafe';
+        if (t.includes('bicicleta') || t.includes('infantil') || t.includes('brinquedo') || t.includes('boneca') || t.includes('bebê') || t.includes('bebe')) return 'infantil';
+        if (t.includes('panela') || t.includes('cozinha') || t.includes('airfryer') || t.includes('faca') || t.includes('prato')) return 'cozinha';
+        if (t.includes('batom') || t.includes('maquiagem') || t.includes('cabelo') || t.includes('pele') || t.includes('sabonete')) return 'beleza';
+        if (t.includes('fone') || t.includes('celular') || t.includes('carregador') || t.includes('led') || t.includes('bluetooth')) return 'tecnologia';
+        if (t.includes('organizador') || t.includes('toalha') || t.includes('almofada') || t.includes('mop')) return 'casa';
+        return 'geral';
+    }
+    function generateShortCode() {
+        const now = Date.now().toString(36).slice(-3).toUpperCase();
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        return (chars.charAt(Math.floor(Math.random() * chars.length)) + now).slice(0, 4);
+    }
+    function generateContent() {
+        const rawInput = document.getElementById("productName").value.trim();
+        if (!rawInput) { alert("Por favor, digite ou cole o nome do produto!"); return; }
+        const cleanTitle = cleanProductName(rawInput);
+        const category = detectCategory(cleanTitle);
+        const template = categoryTemplates[category];
+        const code = generateShortCode();
+
+        const linkMatch = rawInput.match(/https?:\/\/(?:s\.shopee\.com\.br|shopee\.com\.br|www\.shopee\.com\.br)\/\S+/i);
+        const extractedLink = linkMatch ? linkMatch[0].replace(/[.,!?;:)\\]}]+$/, "") : "";
+        document.getElementById("productLink").value = extractedLink;
+
+        let description = "";
+        if (extractedLink) {
+            description += `👉🏻 ${extractedLink} 🔗\n\n`;
+        }
+        
+        let precoMatch = rawInput.match(/R\$\s*([\d\.,]+)/i);
+        let precoStr = precoMatch ? precoMatch[0] : "R$ 0,00";
+
+        description += `${template.header}\n\n${cleanTitle}! 😍\n\n`;
+        description += `💰 **VALOR: ${precoStr}** (bem destacado)\n\n`;
+        description += `💰 Aproveite e confira a oferta!\n🔗 Ou digite o código ${code} no link da bio.\n\n`;
+        
+        let tagProd = template.tags.length > 0 ? template.tags[0] : "#Utensilios";
+        description += `#CozinhaPratica #DicasDeCozinha ${tagProd} #achadinhosimperdíveis #ofertas`;
+
+        document.getElementById("uniqueCode").innerText = code;
+        document.getElementById("postText").innerText = description;
+        document.getElementById("output").style.display = "block";
+    }
+    function copyCode() { navigator.clipboard.writeText(document.getElementById('uniqueCode').innerText); alert('Código copiado!'); }
+    function copyPost() { navigator.clipboard.writeText(document.getElementById('postText').innerText); alert('Texto completo copiado!'); }
+    function sendToSheet() {
+        const code = document.getElementById('uniqueCode').innerText;
+        const link = document.getElementById('productLink').value.trim();
+        if (!link) { alert('Por favor, cole o link do produto antes de enviar!'); return; }
+        const formData = new URLSearchParams();
+        formData.append('code', code);
+        formData.append('link', link);
+        fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: formData.toString() })
+        .then(() => { alert(`✅ Salvo na planilha!\nCódigo: ${code}`); document.getElementById('productLink').value = ''; })
+        .catch(err => alert('❌ Erro: ' + err));
+    }
+    </script>
+    </body>
+    </html>
+    """
+    components.html(html_gerador, height=650, scrolling=True)
+
 with aba_manual:
     st.subheader("Postagem Manual para Redes Sociais")
     col_m1, col_m2 = st.columns(2)
@@ -337,4 +471,47 @@ with aba_manual:
         st.markdown("**Canais de Envio:**")
         manual_fb = st.checkbox("Publicar no Facebook", value=True, key="m_fb")
         manual_tg = st.checkbox("Publicar no Telegram", value=True, key="m_tg")
-    foto_manual = st.file_uploader("📸 Foto do Produto", type
+    foto_manual = st.file_uploader("📸 Foto do Produto", type=["jpg", "jpeg", "png"], key="m_foto")
+
+    if st.button("🚀 Disparar Postagem Manual"):
+        item_temp = {"titulo": titulo, "preco": preco, "link": link}
+        texto_gerado, _ = obter_texto_anuncio(item_temp)
+        
+        imagens_envio = [foto_manual] if foto_manual else []
+        sucesso, resposta = disparar_redes_completo(texto_gerado, link, imagens_envio, enviar_fb=manual_fb, enviar_tg=manual_tg)
+        if sucesso:
+            st.success("✅ Publicado com sucesso nas redes selecionadas!")
+        else:
+            st.error(f"❌ Erro ao publicar: {resposta}")
+
+with aba_fila:
+    st.subheader("📥 Fila de Rascunhos (Supabase)")
+    rascunhos = carregar_rascunhos()
+    if not rascunhos:
+        st.info("Nenhum rascunho na fila no momento.")
+    else:
+        for r in rascunhos:
+            with st.expander(f"📦 Oferta #{r.get('id')} - {r.get('titulo', 'Sem título')[:40]}..."):
+                texto_preview, link_preview = obter_texto_anuncio(r)
+                st.text_area("Texto Formatado", value=texto_preview, height=150, key=f"txt_{r.get('id')}")
+                
+                col_f1, col_f2 = st.columns(2)
+                with col_f1:
+                    if st.button(f"🚀 Publicar Imediato #{r.get('id')}", key=f"pub_{r.get('id')}"):
+                        fotos = obter_fotos_lista(r)
+                        sucesso, resp = disparar_redes_completo(texto_preview, link_preview, fotos)
+                        if sucesso:
+                            remover_rascunho(r.get('id'))
+                            st.success("Publicado e removido da fila!")
+                            st.rerun()
+                        else:
+                            st.error(f"Erro: {resp}")
+                with col_f2:
+                    if st.button(f"🗑️ Excluir #{r.get('id')}", key=f"del_{r.get('id')}"):
+                        remover_rascunho(r.get('id'))
+                        st.success("Removido!")
+                        st.rerun()
+
+with aba_auto:
+    st.subheader("🤖 Piloto Automático")
+    st.write("O sistema está configurado para monitorar e processar automaticamente as novas ofertas cadastradas.")
