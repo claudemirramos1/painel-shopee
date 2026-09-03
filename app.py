@@ -49,20 +49,22 @@ def extrair_dados_do_texto_bruto(texto_bruto):
     match_preco = re.findall(r'R\$\s*([\d\.,]+(?:\s*-\s*R?\$?\s*[\d\.,]+)?)', texto_bruto, re.IGNORECASE)
     if match_preco: preco = match_preco[0]
 
+    # Limpeza rigorosa removendo qualquer menção de preço, "por R$", etc.
     titulo = re.sub(r'(?:Dê uma olhada em\s*)+', '', texto_bruto, flags=re.IGNORECASE)
-    if match_preco: 
-        titulo = re.sub(rf'por\s*R\$\s*{re.escape(preco)}.*', '', titulo, flags=re.IGNORECASE)
-        titulo = re.sub(rf'R\$\s*{re.escape(preco)}.*', '', titulo, flags=re.IGNORECASE)
+    titulo = re.sub(r'por\s*R\$\s*[\d\.,]+.*', '', titulo, flags=re.IGNORECASE)
+    titulo = re.sub(r'R\$\s*[\d\.,]+.*', '', titulo, flags=re.IGNORECASE)
     if link: titulo = titulo.replace(link, '')
     titulo = re.sub(r'Compre na Shopee agora!', '', titulo, flags=re.IGNORECASE).strip()
+    titulo = re.sub(r'[\.\,\!\?\;\:\-\—\–]+$', '', titulo).strip()
     titulo = re.sub(r'\s+', ' ', titulo).strip()
+    
     return titulo or "Oferta Imperdível", preco, link
 
 def obter_texto_anuncio(item):
     texto_base = item.get("formatado") or item.get("titulo") or item.get("descricao") or ""
     titulo, preco, link = extrair_dados_do_texto_bruto(texto_base)
     if item.get("titulo") and "Dê uma olhada" not in str(item.get("titulo")): 
-        titulo = item.get("titulo")
+        titulo, _, _ = extrair_dados_do_texto_bruto(item.get("titulo"))
     if item.get("preco"): 
         preco = item.get("preco")
     if item.get("link"): 
@@ -249,16 +251,12 @@ with aba_gerador:
     
     function cleanProductName(input) {
         let cleaned = input.replace(/(?:dê uma olhada em\s*)+/gi, '');
-        
-        let precoMatch = cleaned.match(/R\$\s*[\d\.,]+(?:\s*-\s*R?\$?\s*[\d\.,]+)?/i);
-        if (precoMatch) {
-            cleaned = cleaned.replace(new RegExp('por\\s*' + precoMatch[0], 'gi'), '');
-            cleaned = cleaned.replace(new RegExp(precoMatch[0], 'g'), '');
-        }
-        
+        cleaned = cleaned.replace(/por\s*R\$\s*[\d\.,]+.*/gi, '');
+        cleaned = cleaned.replace(/R\$\s*[\d\.,]+.*/gi, '');
         cleaned = cleaned.replace(/compre na shopee agora!/gi, '');
         cleaned = cleaned.replace(/^confira\s+/i, '').trim();
-        cleaned = cleaned.replace(/\s+/g, ' ').trim();
+        cleaned = cleaned.replace(/[\\.\\,\\!\\?;\\:\\-\\—\\–]+$/, '').trim();
+        cleaned = cleaned.replace(/\\s+/g, ' ').trim();
         return cleaned;
     }
     
