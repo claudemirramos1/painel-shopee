@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import io
 import re
 import requests
@@ -46,43 +47,34 @@ def extrair_dados_do_texto_bruto(texto_bruto):
     if match_link: link = match_link.group(1)
 
     preco = "0,00"
-    match_preco = re.findall(r'R\$\s*([\d\.,]+(?:\s*-\s*R?\$?\s*[\d\.,]+)?)', texto_bruto, re.IGNORECASE)
-    if match_preco: preco = match_preco[0]
+    match_preco = re.search(r'R\$\s*([\d\.,]+)', texto_bruto, re.IGNORECASE)
+    if match_preco: preco = match_preco.group(1)
 
-    titulo = re.sub(r'(?:Dê uma olhada em\s*)+', '', texto_bruto, flags=re.IGNORECASE)
-    titulo = re.sub(r'por\s*R\$\s*[\d\.,]+.*', '', titulo, flags=re.IGNORECASE)
-    titulo = re.sub(r'R\$\s*[\d\.,]+.*', '', titulo, flags=re.IGNORECASE)
+    titulo = re.sub(r'Dê uma olhada em\s*', '', texto_bruto, flags=re.IGNORECASE)
+    if match_preco: titulo = re.sub(rf'por\s*R\$\s*{re.escape(preco)}.*', '', titulo, flags=re.IGNORECASE)
     if link: titulo = titulo.replace(link, '')
-    titulo = re.sub(r'Compre na Shopee agora!', '', titulo, flags=re.IGNORECASE).strip()
-    titulo = re.sub(r'[\.\,\!\?\;\:\-\—\–]+$', '', titulo).strip()
+    titulo = titulo.replace("Compre na Shopee agora!", "").strip()
     titulo = re.sub(r'\s+', ' ', titulo).strip()
-    
     return titulo or "Oferta Imperdível", preco, link
 
 def obter_texto_anuncio(item):
     texto_base = item.get("formatado") or item.get("titulo") or item.get("descricao") or ""
     titulo, preco, link = extrair_dados_do_texto_bruto(texto_base)
-    if item.get("titulo") and "Dê uma olhada" not in str(item.get("titulo")): 
-        titulo, _, _ = extrair_dados_do_texto_bruto(item.get("titulo"))
-    if item.get("preco"): 
-        preco = item.get("preco")
-    if item.get("link"): 
-        link = item.get("link")
+    if item.get("titulo") and "Dê uma olhada" not in str(item.get("titulo")): titulo = item.get("titulo")
+    if item.get("preco"): preco = item.get("preco")
+    if item.get("link"): link = item.get("link")
     
-    stopwords = {"para", "com", "uma", "esse", "essa", "por", "dos", "das", "que", "como", "mais", "sua", "seu", "feminino", "masculino", "original"}
-    palavras = [w for w in re.findall(r"\b[a-zA-Zá-úÁ-Ú]{4,}\b", titulo.lower()) if w not in stopwords]
-    
-    tag1 = f"#{palavras[0]}" if len(palavras) > 0 else "#achado"
-    tag2 = f"#{palavras[1]}" if len(palavras) > 1 else "#oferta"
+    palavras = re.findall(r"\w+", titulo)
+    palavras_filtradas = [p.capitalize() for p in palavras if len(p) > 3 and p.lower() not in ["para", "com", "uma", "dos", "das"]]
+    hashtag_produto = palavras_filtradas[0] if palavras_filtradas else "Utensilios"
 
     texto_formatado = (
-        f"👉🏻 {link}\n\n"
-        f"🔥✨ Olha esse achadinho incrível!\n\n"
-        f"Dê uma olhada em {titulo}.\n\n"
-        f"💰 **VALOR R$ {preco}**\n\n"
+        f"👉🏻 {link} 🔗\n\n"
+        f"🍳✨ **{titulo}**! 😍\n\n"
+        f"💰 **VALOR: R$ {preco}** (bem destacado)\n\n"
         f"💰 Aproveite e confira a oferta!\n"
-        f"🔗 Ou digite o código **NG5O** no link da bio.\n\n"
-        f"{tag1} {tag2} #achadinhos #achadinhosimperdíveis #ofertas"
+        f"🔗 Ou digite o código no link da bio.\n\n"
+        f"#CozinhaPratica #DicasDeCozinha #{hashtag_produto} #achadinhosimperdíveis #ofertas"
     )
     return texto_formatado, link
 
@@ -173,6 +165,7 @@ def enviar_facebook_com_foto(texto, link, imagem_ref):
         img_io = processar_imagem(img_alvo) if img_alvo else None
         legenda = texto.replace("**", "*")
         if img_io:
+            if link and link not in legenda: legenda += f"\n\n🔗 {link}"
             url = f"https://graph.facebook.com/v19.0/{FACEBOOK_PAGE_ID}/photos"
             r = requests.post(url, data={'caption': legenda, 'access_token': FACEBOOK_ACCESS_TOKEN}, files={'source': ('foto.jpg', img_io.getvalue(), 'image/jpeg')}, timeout=40)
             res = r.json()
@@ -201,7 +194,7 @@ aba_gerador, aba_manual, aba_fila, aba_auto = st.tabs([
 
 with aba_gerador:
     st.subheader("Gerador de Divulgação Inteligente")
-    st.caption("Esta é a interface do seu arquivo HTML incorporada diretamente no Streamlit.")
+    st.caption("Esta é a interface do seu arquivo HTML incorporada diretamente no Streamlit, mantendo o envio integrado para a sua planilha via Web App.")
 
     html_gerador = """
     <!DOCTYPE html>
@@ -219,6 +212,9 @@ with aba_gerador:
             button { margin-top: 18px; width: 100%; padding: 14px; background-color: #28a745; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; }
             button:active { background-color: #218838; }
             .result-box { margin-top: 22px; padding: 16px; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; }
+            .code-row { display: flex; align-items: center; justify-content: space-between; background: #fff3cd; padding: 10px 14px; border-radius: 6px; border: 1px solid #ffeeba; }
+            .code-highlight { font-size: 20px; font-weight: 800; color: #856404; letter-spacing: 1px; }
+            .copy-btn { padding: 6px 12px; font-size: 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; }
             .section-title { font-weight: bold; margin-top: 15px; font-size: 14px; color: #555; }
             pre { white-space: pre-wrap; word-wrap: break-word; font-family: inherit; font-size: 14px; line-height: 1.5; background: #ffffff; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; margin-top: 5px; }
             .btn-copy-all { margin-top: 10px; width: 100%; padding: 10px; background-color: #007bff; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; }
@@ -234,102 +230,101 @@ with aba_gerador:
         <input type="text" id="productName" placeholder="Cole o título ou anúncio completo aqui">
         <button onclick="generateContent()">Gerar Divulgação</button>
         <div class="result-box" id="output" style="display:none;">
-            <div class="section-title">1. Texto Completo para o Post:</div>
+            <div class="section-title">1. Código Único (Curto):</div>
+            <div class="code-row">
+                <span class="code-highlight" id="uniqueCode"></span>
+                <button class="copy-btn" onclick="copyCode()">Copiar Código</button>
+            </div>
+            <div class="section-title">2. Texto Completo para o Post:</div>
             <pre id="postText"></pre>
             <button class="btn-copy-all" onclick="copyPost()">Copiar Texto Completo</button>
-            
-            <div class="section-title">3. Código Gerado (HTML/Texto):</div>
-            <pre id="codeText"></pre>
-            <button class="btn-copy-all" style="background-color: #6c757d;" onclick="copyCode()">Copiar Código</button>
-
             <div class="sheet-box">
-                <div class="section-title" style="margin-top:0;">2. Salvar na Planilha:</div>
+                <div class="section-title" style="margin-top:0;">3. Salvar na Planilha:</div>
                 <label for="productLink" style="margin-top:5px;">Link do Produto / Afiliado:</label>
                 <input type="text" id="productLink" placeholder="https://shopee.com.br/...">
-                <button class="btn-sheet" onclick="sendToSheet()">📊 Salvar Link na Planilha</button>
+                <button class="btn-sheet" onclick="sendToSheet()">📊 Salvar Código e Link na Planilha</button>
             </div>
         </div>
     </div>
     <script>
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzzhTgatVKIUrpE6wVUSYfivNjuJ99RLfuRvISQX1PPZhCypcByxzXcac-bx2y0hg/exec";
-    
+    const categoryTemplates = {
+        cafe: { header: "☕✨ Café fresquinho de um jeito prático!", body: "Perfeito para preparar seu café ou chá onde estiver. Compacto, fácil de usar e sem complicação! 😍", tags: ['#Cafe', '#CafeEmCasa', '#HoraDoCafe'] },
+        infantil: { header: "🚲💖 Diversão garantida para a criançada!", body: "Perfeita para os primeiros passos e momentos inesquecíveis. Super segura, confortável e estilosa! 😍", tags: ['#MundoInfantil', '#Brinquedos', '#Kids'] },
+        cozinha: { header: "🍳✨ Praticidade total na sua cozinha!", body: "O item que faltava para facilitar a sua rotina diária com muito mais eficiência e estilo! 😍", tags: ['#CozinhaPratica', '#DicasDeCozinha', '#Utensilios'] },
+        beleza: { header: "✨💖 Seu momento de autocuidado ainda melhor!", body: "Ideal para manter sua rotina de beleza impecável todos os dias com facilidade! 😍", tags: ['#Beleza', '#Skincare', '#AutoCuidado'] },
+        tecnologia: { header: "⚡🔌 Praticidade e tecnologia no seu dia a dia!", body: "Mais facilidade e eficiência para a sua rotina com qualidade surpreendente! 😍", tags: ['#Tecnologia', '#Gadgets', '#SmartHome'] },
+        casa: { header: "🏠✨ Sua casa ainda mais prática e bonita!", body: "Um item essencial para facilitar a organização e o dia a dia do seu lar! 😍", tags: ['#CasaEOrganizacao', '#Utilidades', '#DicasParaCasa'] },
+        geral: { header: "🔥✨ Olha esse achadinho incrível!", body: "Perfeito para facilitar sua rotina com muita praticidade e qualidade! 😍", tags: ['#Achadinhos', '#Shopee', '#Promoção'] }
+    };
+    const stopWords = ['confira', 'com', 'para', 'rosa', 'azul', 'preto', 'verde', 'amarelo', 'aro', 'desconto', 'somente', 'freio', 'tambor', 'rodas', 'treinamento', 'bicicleta', 'infantil', 'nathor', 'charm'];
     function cleanProductName(input) {
-        let cleaned = input.replace(/(?:dê uma olhada em\s*)+/gi, '');
-        cleaned = cleaned.replace(/por\s*R\$\s*[\d\.,]+.*/gi, '');
-        cleaned = cleaned.replace(/R\$\s*[\d\.,]+.*/gi, '');
-        cleaned = cleaned.replace(/compre na shopee agora!/gi, '');
-        cleaned = cleaned.replace(/^confira\s+/i, '').trim();
-        cleaned = cleaned.replace(/[\\.\\,\\!\\?;\\:\\-\\—\\–]+$/, '').trim();
-        cleaned = cleaned.replace(/\\s+/g, ' ').trim();
-        return cleaned;
+        return input.replace(/^confira\s+/i, '').replace(/com\s+\d+%\s+de\s+desconto.*/i, '').replace(/somente\s+r\$\s*[\d.,]+/i, '').trim();
     }
-    
+    function detectCategory(title) {
+        const t = title.toLowerCase();
+        if (t.includes('café') || t.includes('cafe') || t.includes('coador') || t.includes('xícara')) return 'cafe';
+        if (t.includes('bicicleta') || t.includes('infantil') || t.includes('brinquedo') || t.includes('boneca') || t.includes('bebê') || t.includes('bebe')) return 'infantil';
+        if (t.includes('panela') || t.includes('cozinha') || t.includes('airfryer') || t.includes('faca') || t.includes('prato')) return 'cozinha';
+        if (t.includes('batom') || t.includes('maquiagem') || t.includes('cabelo') || t.includes('pele') || t.includes('sabonete')) return 'beleza';
+        if (t.includes('fone') || t.includes('celular') || t.includes('carregador') || t.includes('led') || t.includes('bluetooth')) return 'tecnologia';
+        if (t.includes('organizador') || t.includes('toalha') || t.includes('almofada') || t.includes('mop')) return 'casa';
+        return 'geral';
+    }
+    function generateShortCode() {
+        const now = Date.now().toString(36).slice(-3).toUpperCase();
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        return (chars.charAt(Math.floor(Math.random() * chars.length)) + now).slice(0, 4);
+    }
     function generateContent() {
         const rawInput = document.getElementById("productName").value.trim();
         if (!rawInput) { alert("Por favor, digite ou cole o nome do produto!"); return; }
+        const cleanTitle = cleanProductName(rawInput);
+        const category = detectCategory(cleanTitle);
+        const template = categoryTemplates[category];
+        const code = generateShortCode();
 
         const linkMatch = rawInput.match(/https?:\/\/(?:s\.shopee\.com\.br|shopee\.com\.br|www\.shopee\.com\.br)\/\S+/i);
-        let extractedLink = linkMatch ? linkMatch[0].replace(/[.,!?;:)\\]}]+$/, "") : "";
-        
-        let cleanedInputForTitle = rawInput;
-        if (extractedLink) {
-            cleanedInputForTitle = cleanedInputForTitle.replace(extractedLink, '');
-        }
-
-        let precoMatch = cleanedInputForTitle.match(/R\$\s*([\d\.,]+(?:\s*-\s*R?\$?\s*[\d\.,]+)?)/i);
-        let precoStr = precoMatch ? precoMatch[1] : "0,00";
-
-        const cleanTitle = cleanProductName(cleanedInputForTitle);
+        const extractedLink = linkMatch ? linkMatch[0].replace(/[.,!?;:)\\]}]+$/, "") : "";
         document.getElementById("productLink").value = extractedLink;
-
-        const stopwords = ["para", "com", "uma", "esse", "essa", "por", "dos", "das", "que", "como", "mais", "sua", "seu", "feminino", "masculino", "original"];
-        let palavrasMatch = cleanTitle.toLowerCase().match(/[a-zà-ú]{4,}/g) || [];
-        let palavras = palavrasMatch.filter(w => !stopwords.includes(w));
-
-        let tag1 = palavras.length > 0 ? '#' + palavras[0] : '#achado';
-        let tag2 = palavras.length > 1 ? '#' + palavras[1] : '#oferta';
 
         let description = "";
         if (extractedLink) {
-            description += "👉🏻 " + extractedLink + "\\n\\n";
+            description += `👉🏻 ${extractedLink} 🔗\n\n`;
         }
         
-        description += "🔥✨ Olha esse achadinho incrível!\\n\\n";
-        description += "Dê uma olhada em " + cleanTitle + ".\\n\\n";
-        description += "💰 **VALOR R$ " + precoStr + "**\\n\\n";
-        description += "💰 Aproveite e confira a oferta!\\n";
-        description += "🔗 Ou digite o código **NG5O** no link da bio.\\n\\n";
-        description += tag1 + " " + tag2 + " #achadinhos #achadinhosimperdíveis #ofertas";
+        let precoMatch = rawInput.match(/R\$\s*([\d\.,]+)/i);
+        let precoStr = precoMatch ? precoMatch[0] : "R$ 0,00";
 
+        description += `${template.header}\n\n${cleanTitle}! 😍\n\n`;
+        description += `💰 **VALOR: ${precoStr}** (bem destacado)\n\n`;
+        description += `💰 Aproveite e confira a oferta!\n🔗 Ou digite o código ${code} no link da bio.\n\n`;
+        
+        let tagProd = template.tags.length > 0 ? template.tags[0] : "#Utensilios";
+        description += `#CozinhaPratica #DicasDeCozinha ${tagProd} #achadinhosimperdíveis #ofertas`;
+
+        document.getElementById("uniqueCode").innerText = code;
         document.getElementById("postText").innerText = description;
-        document.getElementById("codeText").innerText = `<a href="${extractedLink}"><b>${cleanTitle}</b></a><br><b>R$ ${precoStr}</b>`;
         document.getElementById("output").style.display = "block";
     }
-    
-    function copyPost() { 
-        navigator.clipboard.writeText(document.getElementById('postText').innerText); 
-        alert('Texto completo copiado!'); 
-    }
-
-    function copyCode() { 
-        navigator.clipboard.writeText(document.getElementById('codeText').innerText); 
-        alert('Código copiado!'); 
-    }
-    
+    function copyCode() { navigator.clipboard.writeText(document.getElementById('uniqueCode').innerText); alert('Código copiado!'); }
+    function copyPost() { navigator.clipboard.writeText(document.getElementById('postText').innerText); alert('Texto completo copiado!'); }
     function sendToSheet() {
+        const code = document.getElementById('uniqueCode').innerText;
         const link = document.getElementById('productLink').value.trim();
         if (!link) { alert('Por favor, cole o link do produto antes de enviar!'); return; }
         const formData = new URLSearchParams();
+        formData.append('code', code);
         formData.append('link', link);
         fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: formData.toString() })
-        .then(() => { alert('✅ Link salvo na planilha com sucesso!'); document.getElementById('productLink').value = ''; })
+        .then(() => { alert(`✅ Salvo na planilha!\nCódigo: ${code}`); document.getElementById('productLink').value = ''; })
         .catch(err => alert('❌ Erro: ' + err));
     }
     </script>
     </body>
     </html>
     """
-    components.html(html_gerador, height=750, scrolling=True)
+    components.html(html_gerador, height=650, scrolling=True)
 
 with aba_manual:
     st.subheader("Postagem Manual para Redes Sociais")
@@ -342,47 +337,4 @@ with aba_manual:
         st.markdown("**Canais de Envio:**")
         manual_fb = st.checkbox("Publicar no Facebook", value=True, key="m_fb")
         manual_tg = st.checkbox("Publicar no Telegram", value=True, key="m_tg")
-    foto_manual = st.file_uploader("📸 Foto do Produto", type=["jpg", "jpeg", "png"], key="m_foto")
-
-    if st.button("🚀 Disparar Postagem Manual"):
-        item_temp = {"titulo": titulo, "preco": preco, "link": link}
-        texto_gerado, _ = obter_texto_anuncio(item_temp)
-        
-        imagens_envio = [foto_manual] if foto_manual else []
-        sucesso, resposta = disparar_redes_completo(texto_gerado, link, imagens_envio, enviar_fb=manual_fb, enviar_tg=manual_tg)
-        if sucesso:
-            st.success("✅ Publicado com sucesso nas redes selecionadas!")
-        else:
-            st.error(f"❌ Erro ao publicar: {resposta}")
-
-with aba_fila:
-    st.subheader("📥 Fila de Rascunhos (Supabase)")
-    rascunhos = carregar_rascunhos()
-    if not rascunhos:
-        st.info("Nenhum rascunho na fila no momento.")
-    else:
-        for r in rascunhos:
-            with st.expander(f"📦 Oferta #{r.get('id')} - {r.get('titulo', 'Sem título')[:40]}..."):
-                texto_preview, link_preview = obter_texto_anuncio(r)
-                st.text_area("Texto Formatado", value=texto_preview, height=150, key=f"txt_{r.get('id')}")
-                
-                col_f1, col_f2 = st.columns(2)
-                with col_f1:
-                    if st.button(f"🚀 Publicar Imediato #{r.get('id')}", key=f"pub_{r.get('id')}"):
-                        fotos = obter_fotos_lista(r)
-                        sucesso, resp = disparar_redes_completo(texto_preview, link_preview, fotos)
-                        if sucesso:
-                            remover_rascunho(r.get('id'))
-                            st.success("Publicado e removido da fila!")
-                            st.rerun()
-                        else:
-                            st.error(f"Erro: {resp}")
-                with col_f2:
-                    if st.button(f"🗑️ Excluir #{r.get('id')}", key=f"del_{r.get('id')}"):
-                        remover_rascunho(r.get('id'))
-                        st.success("Removido!")
-                        st.rerun()
-
-with aba_auto:
-    st.subheader("🤖 Piloto Automático")
-    st.write("O sistema está configurado para monitorar e processar automaticamente as novas ofertas cadastradas.")
+    foto_manual = st.file_uploader("📸 Foto do Produto", type
