@@ -74,12 +74,11 @@ def obter_texto_anuncio(item):
     tag1 = f"#{palavras[0]}" if len(palavras) > 0 else "#achado"
     tag2 = f"#{palavras[1]}" if len(palavras) > 1 else "#oferta"
 
-    # Emoji de dedo na mesma linha do link (👉🏻 {link})
     texto_formatado = (
         f"👉🏻 {link}\n\n"
         f"🔥✨ Olha esse achadinho incrível!\n\n"
         f"Dê uma olhada em {titulo}.\n\n"
-        f"💰 **R$ {preco}**\n\n"
+        f"💰 **VALOR R$ {preco}**\n\n"
         f"💰 Aproveite e confira a oferta!\n"
         f"🔗 Ou digite o código **NG5O** no link da bio.\n\n"
         f"{tag1} {tag2} #achadinhos #achadinhosimperdíveis #ofertas"
@@ -270,7 +269,6 @@ with aba_gerador:
         const linkMatch = rawInput.match(/https?:\/\/(?:s\.shopee\.com\.br|shopee\.com\.br|www\.shopee\.com\.br)\/\S+/i);
         let extractedLink = linkMatch ? linkMatch[0].replace(/[.,!?;:)\\]}]+$/, "") : "";
         
-        // Remove o link de dentro do texto bruto se ele estiver colado junto
         let cleanedInputForTitle = rawInput;
         if (extractedLink) {
             cleanedInputForTitle = cleanedInputForTitle.replace(extractedLink, '');
@@ -296,7 +294,7 @@ with aba_gerador:
         
         description += "🔥✨ Olha esse achadinho incrível!\\n\\n";
         description += "Dê uma olhada em " + cleanTitle + ".\\n\\n";
-        description += "💰 **R$ " + precoStr + "**\\n\\n";
+        description += "💰 **VALOR R$ " + precoStr + "**\\n\\n";
         description += "💰 Aproveite e confira a oferta!\\n";
         description += "🔗 Ou digite o código **NG5O** no link da bio.\\n\\n";
         description += tag1 + " " + tag2 + " #achadinhos #achadinhosimperdíveis #ofertas";
