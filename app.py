@@ -1,6 +1,5 @@
 import os
 import json
-import time
 import io
 import re
 import requests
@@ -50,21 +49,28 @@ def extrair_dados_do_texto_bruto(texto_bruto):
     match_preco = re.findall(r'R\$\s*([\d\.,]+)', texto_bruto, re.IGNORECASE)
     if match_preco: preco = match_preco[0]
 
-    titulo = re.sub(r'Dê uma olhada em\s*', '', texto_bruto, flags=re.IGNORECASE)
+    # Limpeza rigorosa para evitar repetições indesejadas de "Dê uma olhada em"
+    titulo = re.sub(r'(?:Dê uma olhada em\s*)+', '', texto_bruto, flags=re.IGNORECASE)
     if match_preco: titulo = re.sub(rf'por\s*R\$\s*{re.escape(preco)}.*', '', titulo, flags=re.IGNORECASE)
     if link: titulo = titulo.replace(link, '')
-    titulo = titulo.replace("Compre na Shopee agora!", "").strip()
+    titulo = re.sub(r'Compre na Shopee agora!', '', titulo, flags=re.IGNORECASE).strip()
     titulo = re.sub(r'\s+', ' ', titulo).strip()
     return titulo or "Oferta Imperdível", preco, link
 
 def obter_texto_anuncio(item):
     texto_base = item.get("formatado") or item.get("titulo") or item.get("descricao") or ""
     titulo, preco, link = extrair_dados_do_texto_bruto(texto_base)
-    if item.get("titulo") and "Dê uma olhada" not in str(item.get("titulo")): titulo = item.get("titulo")
-    if item.get("preco"): preco = item.get("preco")
-    if item.get("link"): link = item.get("link")
+    if item.get("titulo") and "Dê uma olhada" not in str(item.get("titulo")): 
+        titulo = item.get("titulo")
+    if item.get("preco"): 
+        preco = item.get("preco")
+    if item.get("link"): 
+        link = item.get("link")
     
-    palavras = re.findall(r"\b[a-zA-Zá-úÁ-Ú]{4,}\b", titulo.lower())
+    # Palavras ignoradas para não gerarem hashtags inúteis (preposições, artigos, termos genéricos)
+    stopwords = {"para", "com", "uma", "esse", "essa", "por", "dos", "das", "que", "como", "mais", "sua", "seu"}
+    palavras = [w for w in re.findall(r"\b[a-zA-Zá-úÁ-Ú]{4,}\b", titulo.lower()) if w not in stopwords]
+    
     tag1 = f"#{palavras[0]}" if len(palavras) > 0 else "#achado"
     tag2 = f"#{palavras[1]}" if len(palavras) > 1 else "#oferta"
 
@@ -242,7 +248,9 @@ with aba_gerador:
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzzhTgatVKIUrpE6wVUSYfivNjuJ99RLfuRvISQX1PPZhCypcByxzXcac-bx2y0hg/exec";
     
     function cleanProductName(input) {
-        return input.replace(/^confira\s+/i, '').replace(/com\s+\d+%\s+de\s+desconto.*/i, '').replace(/somente\s+r\$\s*[\d.,]+/i, '').trim();
+        let cleaned = input.replace(/(?:dê uma olhada em\s*)+/gi, '');
+        cleaned = cleaned.replace(/^confira\s+/i, '').replace(/com\s+\d+%\s+de\s+desconto.*/i, '').replace(/somente\s+r\$\s*[\d.,]+/i, '').trim();
+        return cleaned;
     }
     
     function generateContent() {
@@ -257,7 +265,10 @@ with aba_gerador:
         let precoMatch = rawInput.match(/R\$\s*([\d\.,]+)/i);
         let precoStr = precoMatch ? precoMatch[0] : "R$ 0,00";
 
-        let palavras = cleanTitle.toLowerCase().match(/[a-zà-ú]{4,}/g) || [];
+        const stopwords = ["para", "com", "uma", "esse", "essa", "por", "dos", "das", "que", "como", "mais", "sua", "seu"];
+        let palavrasMatch = cleanTitle.toLowerCase().match(/[a-zà-ú]{4,}/g) || [];
+        let palavras = palavrasMatch.filter(w => !stopwords.includes(w));
+
         let tag1 = palavras.length > 0 ? '#' + palavras[0] : '#achado';
         let tag2 = palavras.length > 1 ? '#' + palavras[1] : '#oferta';
 
