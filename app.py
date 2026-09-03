@@ -49,7 +49,6 @@ def extrair_dados_do_texto_bruto(texto_bruto):
     match_preco = re.findall(r'R\$\s*([\d\.,]+(?:\s*-\s*R?\$?\s*[\d\.,]+)?)', texto_bruto, re.IGNORECASE)
     if match_preco: preco = match_preco[0]
 
-    # Limpeza rigorosa para remover "Dê uma olhada em", valores no meio do texto e links do título
     titulo = re.sub(r'(?:Dê uma olhada em\s*)+', '', texto_bruto, flags=re.IGNORECASE)
     if match_preco: 
         titulo = re.sub(rf'por\s*R\$\s*{re.escape(preco)}.*', '', titulo, flags=re.IGNORECASE)
@@ -69,18 +68,18 @@ def obter_texto_anuncio(item):
     if item.get("link"): 
         link = item.get("link")
     
-    # Palavras ignoradas para não gerarem hashtags inúteis
-    stopwords = {"para", "com", "uma", "esse", "essa", "por", "dos", "das", "que", "como", "mais", "sua", "seu", "feminino", "masculino"}
+    stopwords = {"para", "com", "uma", "esse", "essa", "por", "dos", "das", "que", "como", "mais", "sua", "seu", "feminino", "masculino", "original"}
     palavras = [w for w in re.findall(r"\b[a-zA-Zá-úÁ-Ú]{4,}\b", titulo.lower()) if w not in stopwords]
     
     tag1 = f"#{palavras[0]}" if len(palavras) > 0 else "#achado"
     tag2 = f"#{palavras[1]}" if len(palavras) > 1 else "#oferta"
 
+    # Emoji de dedo na mesma linha do link (👉🏻 {link})
     texto_formatado = (
         f"👉🏻 {link}\n\n"
         f"🔥✨ Olha esse achadinho incrível!\n\n"
         f"Dê uma olhada em {titulo}.\n\n"
-        f"💰 **A partir de R$ {preco}**\n\n"
+        f"💰 **R$ {preco}**\n\n"
         f"💰 Aproveite e confira a oferta!\n"
         f"🔗 Ou digite o código **NG5O** no link da bio.\n\n"
         f"{tag1} {tag2} #achadinhos #achadinhosimperdíveis #ofertas"
@@ -258,7 +257,7 @@ with aba_gerador:
             cleaned = cleaned.replace(new RegExp(precoMatch[0], 'g'), '');
         }
         
-        cleaned = cleaned.replace(/comida|compre na shopee agora!/gi, '');
+        cleaned = cleaned.replace(/compre na shopee agora!/gi, '');
         cleaned = cleaned.replace(/^confira\s+/i, '').trim();
         cleaned = cleaned.replace(/\s+/g, ' ').trim();
         return cleaned;
@@ -269,15 +268,21 @@ with aba_gerador:
         if (!rawInput) { alert("Por favor, digite ou cole o nome do produto!"); return; }
 
         const linkMatch = rawInput.match(/https?:\/\/(?:s\.shopee\.com\.br|shopee\.com\.br|www\.shopee\.com\.br)\/\S+/i);
-        const extractedLink = linkMatch ? linkMatch[0].replace(/[.,!?;:)\\]}]+$/, "") : "";
-        document.getElementById("productLink").value = extractedLink;
+        let extractedLink = linkMatch ? linkMatch[0].replace(/[.,!?;:)\\]}]+$/, "") : "";
+        
+        // Remove o link de dentro do texto bruto se ele estiver colado junto
+        let cleanedInputForTitle = rawInput;
+        if (extractedLink) {
+            cleanedInputForTitle = cleanedInputForTitle.replace(extractedLink, '');
+        }
 
-        let precoMatch = rawInput.match(/R\$\s*([\d\.,]+(?:\s*-\s*R?\$?\s*[\d\.,]+)?)/i);
+        let precoMatch = cleanedInputForTitle.match(/R\$\s*([\d\.,]+(?:\s*-\s*R?\$?\s*[\d\.,]+)?)/i);
         let precoStr = precoMatch ? precoMatch[1] : "0,00";
 
-        const cleanTitle = cleanProductName(rawInput);
+        const cleanTitle = cleanProductName(cleanedInputForTitle);
+        document.getElementById("productLink").value = extractedLink;
 
-        const stopwords = ["para", "com", "uma", "esse", "essa", "por", "dos", "das", "que", "como", "mais", "sua", "seu", "feminino", "masculino"];
+        const stopwords = ["para", "com", "uma", "esse", "essa", "por", "dos", "das", "que", "como", "mais", "sua", "seu", "feminino", "masculino", "original"];
         let palavrasMatch = cleanTitle.toLowerCase().match(/[a-zà-ú]{4,}/g) || [];
         let palavras = palavrasMatch.filter(w => !stopwords.includes(w));
 
@@ -291,7 +296,7 @@ with aba_gerador:
         
         description += "🔥✨ Olha esse achadinho incrível!\\n\\n";
         description += "Dê uma olhada em " + cleanTitle + ".\\n\\n";
-        description += "💰 **A partir de R$ " + precoStr + "**\\n\\n";
+        description += "💰 **R$ " + precoStr + "**\\n\\n";
         description += "💰 Aproveite e confira a oferta!\\n";
         description += "🔗 Ou digite o código **NG5O** no link da bio.\\n\\n";
         description += tag1 + " " + tag2 + " #achadinhos #achadinhosimperdíveis #ofertas";
