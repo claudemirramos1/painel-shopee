@@ -196,6 +196,107 @@ with aba_gerador:
     st.subheader("Gerador de Divulgação Inteligente")
     st.caption("Esta é a interface do seu arquivo HTML incorporada diretamente no Streamlit.")
 
+    html_gerador = """
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+        <meta charset="UTF-8">
+        <style>
+            * { box-sizing: border-box; }
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 10px; background-color: #f0f2f5; color: #1c1e21; margin: 0; }
+            .container { background: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); max-width: 100%; margin: 0 auto; }
+            h2 { margin-top: 0; font-size: 20px; color: #111; text-align: center; }
+            label { font-weight: 600; display: block; margin-top: 15px; font-size: 14px; color: #444; }
+            input[type="text"] { width: 100%; padding: 12px; margin-top: 6px; border: 1px solid #ccc; border-radius: 8px; font-size: 15px; outline: none; }
+            input[type="text"]:focus { border-color: #007bff; }
+            button { margin-top: 18px; width: 100%; padding: 14px; background-color: #28a745; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; }
+            button:active { background-color: #218838; }
+            .result-box { margin-top: 22px; padding: 16px; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; }
+            .section-title { font-weight: bold; margin-top: 15px; font-size: 14px; color: #555; }
+            pre { white-space: pre-wrap; word-wrap: break-word; font-family: inherit; font-size: 14px; line-height: 1.5; background: #ffffff; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; margin-top: 5px; }
+            .btn-copy-all { margin-top: 10px; width: 100%; padding: 10px; background-color: #007bff; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; }
+            .sheet-box { margin-top: 20px; padding: 15px; background: #e7f5ff; border: 1px solid #b3d7ff; border-radius: 8px; }
+            .btn-sheet { background-color: #17a2b8; margin-top: 10px; }
+            .btn-sheet:active { background-color: #138496; }
+        </style>
+    </head>
+    <body>
+    <div class="container">
+        <h2>✨ Gerador de Post & Código</h2>
+        <label for="productName">Cole a oferta ou nome do produto:</label>
+        <input type="text" id="productName" placeholder="Cole o título ou anúncio completo aqui">
+        <button onclick="generateContent()">Gerar Divulgação</button>
+        <div class="result-box" id="output" style="display:none;">
+            <div class="section-title">1. Texto Completo para o Post:</div>
+            <pre id="postText"></pre>
+            <button class="btn-copy-all" onclick="copyPost()">Copiar Texto Completo</button>
+            <div class="sheet-box">
+                <div class="section-title" style="margin-top:0;">2. Salvar na Planilha:</div>
+                <label for="productLink" style="margin-top:5px;">Link do Produto / Afiliado:</label>
+                <input type="text" id="productLink" placeholder="https://shopee.com.br/...">
+                <button class="btn-sheet" onclick="sendToSheet()">📊 Salvar Link na Planilha</button>
+            </div>
+        </div>
+    </div>
+    <script>
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzzhTgatVKIUrpE6wVUSYfivNjuJ99RLfuRvISQX1PPZhCypcByxzXcac-bx2y0hg/exec";
+    
+    function cleanProductName(input) {
+        return input.replace(/^confira\s+/i, '').replace(/com\s+\d+%\s+de\s+desconto.*/i, '').replace(/somente\s+r\$\s*[\d.,]+/i, '').trim();
+    }
+    
+    function generateContent() {
+        const rawInput = document.getElementById("productName").value.trim();
+        if (!rawInput) { alert("Por favor, digite ou cole o nome do produto!"); return; }
+        const cleanTitle = cleanProductName(rawInput);
+
+        const linkMatch = rawInput.match(/https?:\/\/(?:s\.shopee\.com\.br|shopee\.com\.br|www\.shopee\.com\.br)\/\S+/i);
+        const extractedLink = linkMatch ? linkMatch[0].replace(/[.,!?;:)\\]}]+$/, "") : "";
+        document.getElementById("productLink").value = extractedLink;
+
+        let precoMatch = rawInput.match(/R\$\s*([\d\.,]+)/i);
+        let precoStr = precoMatch ? precoMatch[0] : "R$ 0,00";
+
+        let palavras = cleanTitle.toLowerCase().match(/[a-zà-ú]{4,}/g) || [];
+        let tag1 = palavras.length > 0 ? '#' + palavras[0] : '#achado';
+        let tag2 = palavras.length > 1 ? '#' + palavras[1] : '#oferta';
+
+        let description = "";
+        if (extractedLink) {
+            description += "👉🏻 " + extractedLink + "\\n\\n";
+        }
+        
+        description += "🔥✨ Olha esse achadinho incrível!\\n\\n";
+        description += "Dê uma olhada em " + cleanTitle + ".\\n\\n";
+        description += "💰 **A partir de " + precoStr + "**\\n\\n";
+        description += "💰 Aproveite e confira a oferta!\\n";
+        description += "🔗 Ou digite o código **NG5O** no link da bio.\\n\\n";
+        description += tag1 + " " + tag2 + " #achadinhos #achadinhosimperdíveis #ofertas";
+
+        document.getElementById("postText").innerText = description;
+        document.getElementById("output").style.display = "block";
+    }
+    
+    function copyPost() { 
+        navigator.clipboard.writeText(document.getElementById('postText').innerText); 
+        alert('Texto completo copiado!'); 
+    }
+    
+    function sendToSheet() {
+        const link = document.getElementById('productLink').value.trim();
+        if (!link) { alert('Por favor, cole o link do produto antes de enviar!'); return; }
+        const formData = new URLSearchParams();
+        formData.append('link', link);
+        fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: formData.toString() })
+        .then(() => { alert('✅ Link salvo na planilha com sucesso!'); document.getElementById('productLink').value = ''; })
+        .catch(err => alert('❌ Erro: ' + err));
+    }
+    </script>
+    </body>
+    </html>
+    """
+    components.html(html_gerador, height=650, scrolling=True)
+
 with aba_manual:
     st.subheader("Postagem Manual para Redes Sociais")
     col_m1, col_m2 = st.columns(2)
