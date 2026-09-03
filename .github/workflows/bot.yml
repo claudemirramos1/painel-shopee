@@ -25,15 +25,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install requests google-genai Pillow
 
-    - name: Run Video Bot
-      env:
-        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        PAGE_ACCESS_TOKEN: ${{ secrets.PAGE_ACCESS_TOKEN }}
-        MAIN_PAGE_ID: ${{ secrets.MAIN_PAGE_ID }}
-        PAGE_ID: ${{ secrets.PAGE_ID }}
-      run: |
-        python bot_video.py
-
     - name: Run Product/Telegram Bot
       env:
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
