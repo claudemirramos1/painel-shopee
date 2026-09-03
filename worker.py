@@ -177,9 +177,52 @@ def processar_imagem(img_url):
     except:
         return None
 
-def enviar_telegram(texto, imagens_ref):
+def processar_video(video_url):
+    try:
+        resp = requests.get(video_url, timeout=120)
+        if resp.status_code != 200:
+            print(f"❌ Erro ao baixar vídeo: HTTP {resp.status_code}")
+            return None
+
+        return resp.content
+    except Exception as e:
+        print(f"❌ Erro ao baixar vídeo: {e}")
+        return None
+
+
+def enviar_telegram(texto, imagens_ref, video_ref=None):
     if not TELEGRAM_CANAL_TOKEN or not TELEGRAM_CANAL_ID: return False
     try:
+        if video_ref:
+            video_data = processar_video(video_ref)
+
+            if video_data:
+                url = f"https://api.telegram.org/bot{TELEGRAM_CANAL_TOKEN}/sendVideo"
+                r = requests.post(
+                    url,
+                    data={
+                        "chat_id": TELEGRAM_CANAL_ID,
+                        "caption": texto,
+                        "parse_mode": "Markdown"
+                    },
+                    files={
+                        "video": ("video.mp4", video_data, "video/mp4")
+                    },
+                    timeout=180
+                )
+
+                resposta = r.json()
+
+                if resposta.get("ok", False):
+                    print("🎥 Vídeo enviado para o Telegram.")
+                    return True
+
+                print(f"❌ Erro Telegram vídeo: {r.text}")
+                return False
+
+            print("❌ Não foi possível baixar o vídeo.")
+            return False
+
         if not imagens_ref:
             url = f"https://api.telegram.org/bot{TELEGRAM_CANAL_TOKEN}/sendMessage"
             r = requests.post(url, data={'chat_id': TELEGRAM_CANAL_ID, 'text': texto, 'parse_mode': 'Markdown'}, timeout=30)
@@ -208,7 +251,7 @@ def enviar_telegram(texto, imagens_ref):
     except:
         return False
 
-def enviar_facebook(texto, link, imagem_url=None, categoria="PROMONOMIA_OFERTAS"):
+def enviar_facebook(texto, link, imagem_url=None, video_url=None, categoria="PROMONOMIA_OFERTAS"):
     cfg = PAGINAS_DESTINO.get(categoria, PAGINAS_DESTINO["PROMONOMIA_OFERTAS"])
     page_id = cfg["id"]
     access_token = cfg["token"]
@@ -216,6 +259,35 @@ def enviar_facebook(texto, link, imagem_url=None, categoria="PROMONOMIA_OFERTAS"
     if not page_id or not access_token: return False
     try:
         legenda = texto.replace("**", "*")
+
+        if video_url:
+            video_data = processar_video(video_url)
+
+            if video_data:
+                url = f"https://graph.facebook.com/v19.0/{page_id}/videos"
+                r = requests.post(
+                    url,
+                    data={
+                        "description": legenda,
+                        "access_token": access_token
+                    },
+                    files={
+                        "source": ("video.mp4", video_data, "video/mp4")
+                    },
+                    timeout=180
+                )
+
+                resposta = r.json()
+
+                if "id" in resposta:
+                    print(f"🎥 [SUCESSO] Vídeo publicado na página: {categoria} (ID: {page_id})")
+                    return True
+
+                print(f"❌ Erro Facebook vídeo ({categoria}): {r.text}")
+                return False
+
+            return False
+
         if imagem_url:
             img_io = processar_imagem(imagem_url)
             if img_io:
@@ -246,15 +318,16 @@ if rascunhos:
     texto, link = obter_texto_anuncio(proxima)
     fotos = obter_fotos_lista(proxima)
     foto_principal = fotos[0] if fotos else None
+    video = proxima.get("video")
 
     print(f"🚀 Publicando oferta: {texto_bruto_oferta[:60]}...")
-    ok_tg = enviar_telegram(texto, fotos)
+    ok_tg = enviar_telegram(texto, fotos, video_ref=video)
     
     paginas_alvo = set(["PROMONOMIA_OFERTAS"] + categorias_detectadas)
     
     sucesso_geral = False
     for cat in paginas_alvo:
-        ok_fb = enviar_facebook(texto, link, foto_principal, categoria=cat)
+        ok_fb = enviar_facebook(texto, link, foto_principal, video_url=video, categoria=cat)
         if ok_fb:
             sucesso_geral = True
 
