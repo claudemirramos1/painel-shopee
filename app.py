@@ -49,7 +49,6 @@ def extrair_dados_do_texto_bruto(texto_bruto):
     match_preco = re.findall(r'R\$\s*([\d\.,]+(?:\s*-\s*R?\$?\s*[\d\.,]+)?)', texto_bruto, re.IGNORECASE)
     if match_preco: preco = match_preco[0]
 
-    # Limpeza rigorosa removendo qualquer menção de preço, "por R$", etc.
     titulo = re.sub(r'(?:Dê uma olhada em\s*)+', '', texto_bruto, flags=re.IGNORECASE)
     titulo = re.sub(r'por\s*R\$\s*[\d\.,]+.*', '', titulo, flags=re.IGNORECASE)
     titulo = re.sub(r'R\$\s*[\d\.,]+.*', '', titulo, flags=re.IGNORECASE)
@@ -238,6 +237,11 @@ with aba_gerador:
             <div class="section-title">1. Texto Completo para o Post:</div>
             <pre id="postText"></pre>
             <button class="btn-copy-all" onclick="copyPost()">Copiar Texto Completo</button>
+            
+            <div class="section-title">3. Código Gerado (HTML/Texto):</div>
+            <pre id="codeText"></pre>
+            <button class="btn-copy-all" style="background-color: #6c757d;" onclick="copyCode()">Copiar Código</button>
+
             <div class="sheet-box">
                 <div class="section-title" style="margin-top:0;">2. Salvar na Planilha:</div>
                 <label for="productLink" style="margin-top:5px;">Link do Produto / Afiliado:</label>
@@ -298,12 +302,18 @@ with aba_gerador:
         description += tag1 + " " + tag2 + " #achadinhos #achadinhosimperdíveis #ofertas";
 
         document.getElementById("postText").innerText = description;
+        document.getElementById("codeText").innerText = `<a href="${extractedLink}"><b>${cleanTitle}</b></a><br><b>R$ ${precoStr}</b>`;
         document.getElementById("output").style.display = "block";
     }
     
     function copyPost() { 
         navigator.clipboard.writeText(document.getElementById('postText').innerText); 
         alert('Texto completo copiado!'); 
+    }
+
+    function copyCode() { 
+        navigator.clipboard.writeText(document.getElementById('codeText').innerText); 
+        alert('Código copiado!'); 
     }
     
     function sendToSheet() {
@@ -319,7 +329,7 @@ with aba_gerador:
     </body>
     </html>
     """
-    components.html(html_gerador, height=650, scrolling=True)
+    components.html(html_gerador, height=750, scrolling=True)
 
 with aba_manual:
     st.subheader("Postagem Manual para Redes Sociais")
