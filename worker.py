@@ -181,6 +181,9 @@ def processar_imagem(img_url):
 
 def processar_video(video_url):
     try:
+        if isinstance(video_url, bytes):
+            return video_url
+
         if os.path.isfile(video_url):
             with open(video_url, "rb") as f:
                 return f.read()
