@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.bak
+*.mp4
+*.jpg
+*.jpeg
+*.png
+*.webp
+*.bak*
+teste_*.py
+worker.py.*

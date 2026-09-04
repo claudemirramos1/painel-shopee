@@ -3,9 +3,11 @@ import json
 import io
 import re
 import time
+import tempfile
 import requests
 from PIL import Image, ImageOps
 from google import genai
+from juntar_video_foto import juntar_video_foto
 
 SUPABASE_URL = "https://ftumdeqziwyljmaehaqk.supabase.co"
 SUPABASE_KEY = "sb_publishable_8qfsBhW22Sx25mvPcxWNvw_4teJRbfu"
@@ -64,7 +66,7 @@ def remover_rascunho(rascunho_id):
 def classificar_por_palavras_chave(texto):
     texto_lower = texto.lower()
     categorias_encontradas = []
-    
+
     if any(k in texto_lower for k in ["infantil", "bebe", "nenem", "crianca", "brinquedo", "chupeta", "fralda", "maternidade", "carrinho de bebe"]):
         categorias_encontradas.append("BEBE_INFANTIL")
     if any(k in texto_lower for k in ["carro", "moto", "automotivo", "veiculo", "pneu", "retrovisor", "farol", "volante", "tapete automotivo"]):
@@ -75,14 +77,14 @@ def classificar_por_palavras_chave(texto):
         categorias_encontradas.append("MODA_FEMININA")
     if any(k in texto_lower for k in ["masculina", "bermuda", "calca jeans", "camisa polo", "tenis masculino", "carteira masculina"]):
         categorias_encontradas.append("MODA_MASCULINA")
-        
+
     return categorias_encontradas if categorias_encontradas else ["PROMONOMIA_OFERTAS"]
 
 def classificar_oferta_gemini(texto_post):
     GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
     if not GEMINI_API_KEY:
         return classificar_por_palavras_chave(texto_post)
-        
+
     tentativas = 3
     for tentativa in range(1, tentativas + 1):
         try:
@@ -98,10 +100,10 @@ def classificar_oferta_gemini(texto_post):
             """
             response = client.chats.create(model="gemini-3.6-flash").send_message(prompt)
             resposta_texto = response.text.strip().upper().replace(".", "")
-            
+
             candidatas = [c.strip() for c in resposta_texto.split(",")]
             cats_validas = [c for c in candidatas if c in PAGINAS_DESTINO]
-            
+
             if cats_validas:
                 print(f"🎯 Categorias identificadas pela IA: {cats_validas}")
                 return cats_validas
@@ -109,7 +111,7 @@ def classificar_oferta_gemini(texto_post):
             print(f"⚠️ Tentativa {tentativa}/{tentativas} - Erro na IA Gemini: {e}")
             if tentativa < tentativas:
                 time.sleep(2)
-            
+
     print("⚠️ Falha na IA após 3 tentativas. Acionando fallback por palavras-chave...")
     return classificar_por_palavras_chave(texto_post)
 
@@ -179,6 +181,10 @@ def processar_imagem(img_url):
 
 def processar_video(video_url):
     try:
+        if os.path.isfile(video_url):
+            with open(video_url, "rb") as f:
+                return f.read()
+
         resp = requests.get(video_url, timeout=120)
         if resp.status_code != 200:
             print(f"❌ Erro ao baixar vídeo: HTTP {resp.status_code}")
@@ -189,6 +195,70 @@ def processar_video(video_url):
         print(f"❌ Erro ao baixar vídeo: {e}")
         return None
 
+
+def criar_video_com_foto(video_url, fotos_urls):
+    try:
+        if not video_url or not fotos_urls:
+            return None
+
+        pasta_temp = tempfile.mkdtemp(prefix="video_foto_")
+        video_original = os.path.join(pasta_temp, "video_original.mp4")
+        fotos_originais = []
+
+        print("⬇️ Baixando vídeo para montagem...")
+        video_data = processar_video(video_url)
+
+        if not video_data:
+            print("❌ Não foi possível baixar o vídeo para montagem.")
+            return None
+
+        with open(video_original, "wb") as f:
+            f.write(video_data)
+
+        for i, foto_url in enumerate(fotos_urls, 1):
+            print(f"⬇️ Baixando foto {i}/{len(fotos_urls)} para montagem...")
+            foto_data = processar_imagem(foto_url)
+
+            if not foto_data:
+                print(f"⚠️ Não foi possível baixar a foto {i}. Pulando...")
+                continue
+
+            foto_original = os.path.join(
+                pasta_temp,
+                f"foto_{i}.jpg"
+            )
+
+            with open(foto_original, "wb") as f:
+                f.write(foto_data.getvalue())
+
+            fotos_originais.append(foto_original)
+
+        if not fotos_originais:
+            print("❌ Nenhuma foto pôde ser baixada para a montagem.")
+            return None
+
+        video_final = os.path.join(pasta_temp, "video_final.mp4")
+
+        print(f"🎬 Montando vídeo + {len(fotos_originais)} foto(s)...")
+
+        juntar_video_foto(
+            video_original,
+            fotos_originais,
+            video_final
+        )
+
+        if not os.path.exists(video_final):
+            print("❌ O vídeo combinado não foi criado.")
+            return None
+
+        print("✅ Vídeo combinado criado com sucesso.")
+
+        with open(video_final, "rb") as f:
+            return f.read()
+
+    except Exception as e:
+        print(f"❌ Erro ao criar vídeo combinado: {e}")
+        return None
 
 def enviar_telegram(texto, imagens_ref, video_ref=None):
     if not TELEGRAM_CANAL_TOKEN or not TELEGRAM_CANAL_ID: return False
@@ -255,7 +325,7 @@ def enviar_facebook(texto, link, imagem_url=None, video_url=None, categoria="PRO
     cfg = PAGINAS_DESTINO.get(categoria, PAGINAS_DESTINO["PROMONOMIA_OFERTAS"])
     page_id = cfg["id"]
     access_token = cfg["token"]
-    
+
     if not page_id or not access_token: return False
     try:
         legenda = texto.replace("**", "*")
@@ -308,33 +378,47 @@ def enviar_facebook(texto, link, imagem_url=None, video_url=None, categoria="PRO
         print(f"❌ Erro ao postar no Facebook ({categoria}): {e}")
         return False
 
-rascunhos = carregar_rascunhos()
-if rascunhos:
-    proxima = rascunhos[0]
-    texto_bruto_oferta = proxima.get('titulo') or proxima.get('formatado') or ""
-    
-    categorias_detectadas = classificar_oferta_gemini(texto_bruto_oferta)
-    
-    texto, link = obter_texto_anuncio(proxima)
-    fotos = obter_fotos_lista(proxima)
-    foto_principal = fotos[0] if fotos else None
-    video = proxima.get("video")
+if __name__ == "__main__":
+    rascunhos = carregar_rascunhos()
+    if rascunhos:
+        proxima = rascunhos[0]
+        texto_bruto_oferta = proxima.get('titulo') or proxima.get('formatado') or ""
 
-    print(f"🚀 Publicando oferta: {texto_bruto_oferta[:60]}...")
-    ok_tg = enviar_telegram(texto, fotos, video_ref=video)
-    
-    paginas_alvo = set(["PROMONOMIA_OFERTAS"] + categorias_detectadas)
-    
-    sucesso_geral = False
-    for cat in paginas_alvo:
-        ok_fb = enviar_facebook(texto, link, foto_principal, video_url=video, categoria=cat)
-        if ok_fb:
-            sucesso_geral = True
+        categorias_detectadas = classificar_oferta_gemini(texto_bruto_oferta)
 
-    if ok_tg or sucesso_geral:
-        remover_rascunho(proxima["id"])
-        print("✅ Oferta processada, publicada em todas as páginas correspondentes e removida com sucesso!")
+        texto, link = obter_texto_anuncio(proxima)
+        fotos = obter_fotos_lista(proxima)
+        foto_principal = fotos[0] if fotos else None
+        video = proxima.get("video")
+
+        # Se houver vídeo e foto, cria um único vídeo com a foto no final.
+        # Se a montagem falhar, mantém o vídeo original como fallback.
+        video_para_publicar = video
+
+        if video and fotos:
+            print(f"🎬 Vídeo + {len(fotos)} foto(s) detectados. Criando vídeo combinado...")
+            video_combinado = criar_video_com_foto(video, fotos)
+
+            if video_combinado:
+                video_para_publicar = video_combinado
+            else:
+                print("⚠️ Montagem falhou. Usando vídeo original.")
+
+        print(f"🚀 Publicando oferta: {texto_bruto_oferta[:60]}...")
+        ok_tg = enviar_telegram(texto, fotos, video_ref=video_para_publicar)
+
+        paginas_alvo = set(["PROMONOMIA_OFERTAS"] + categorias_detectadas)
+
+        sucesso_geral = False
+        for cat in paginas_alvo:
+            ok_fb = enviar_facebook(texto, link, foto_principal, video_url=video_para_publicar, categoria=cat)
+            if ok_fb:
+                sucesso_geral = True
+
+        if ok_tg or sucesso_geral:
+            remover_rascunho(proxima["id"])
+            print("✅ Oferta processada, publicada em todas as páginas correspondentes e removida com sucesso!")
+        else:
+            print("❌ Falha ao publicar oferta.")
     else:
-        print("❌ Falha ao publicar oferta.")
-else:
-    print("📭 Fila de ofertas vazia.")
+        print("📭 Fila de ofertas vazia.")
