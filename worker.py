@@ -382,24 +382,79 @@ def enviar_facebook(texto, link, imagem_url=None, video_url=None, categoria="PRO
         return False
 
 if __name__ == "__main__":
-    rascunhos = carregar_rascunhos()
-    if rascunhos:
-        proxima = rascunhos[0]
-        texto_bruto_oferta = proxima.get('titulo') or proxima.get('formatado') or ""
+    INTERVALO_MINUTOS = 15
 
-        categorias_detectadas = classificar_oferta_gemini(texto_bruto_oferta)
+    print("🤖 Worker iniciado.")
+    print(f"⏱️ Intervalo entre publicações: {INTERVALO_MINUTOS} minutos")
+
+    try:
+        rascunhos = carregar_rascunhos()
+
+        if not rascunhos:
+            print("📭 Fila de ofertas vazia. Encerrando execução.")
+            exit(0)
+
+        headers = {
+            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type": "application/json"
+        }
+
+        url_controle = (
+            f"{SUPABASE_URL.rsplit('/ofertas', 1)[0]}"
+            "/rest/v1/rpc/tentar_reservar_publicacao"
+        )
+
+        resposta_reserva = requests.post(
+            url_controle,
+            headers=headers,
+            json={},
+            timeout=20
+        )
+
+        if resposta_reserva.status_code != 200:
+            print(
+                f"❌ Erro ao verificar intervalo de publicação: "
+                f"{resposta_reserva.status_code} - {resposta_reserva.text}"
+            )
+            exit(1)
+
+        pode_publicar = resposta_reserva.json()
+
+        if not pode_publicar:
+            print(
+                "⏳ Ainda não passaram 15 minutos desde a última "
+                "reserva/publicação. Encerrando execução."
+            )
+            exit(0)
+
+        proxima = rascunhos[0]
+
+        texto_bruto_oferta = (
+            proxima.get("titulo")
+            or proxima.get("formatado")
+            or ""
+        )
+
+        categorias_detectadas = classificar_oferta_gemini(
+            texto_bruto_oferta
+        )
 
         texto, link = obter_texto_anuncio(proxima)
+
         fotos = obter_fotos_lista(proxima)
         foto_principal = fotos[0] if fotos else None
+
         video = proxima.get("video")
 
-        # Se houver vídeo e foto, cria um único vídeo com a foto no final.
-        # Se a montagem falhar, mantém o vídeo original como fallback.
         video_para_publicar = video
 
         if video and fotos:
-            print(f"🎬 Vídeo + {len(fotos)} foto(s) detectados. Criando vídeo combinado...")
+            print(
+                f"🎬 Vídeo + {len(fotos)} foto(s) detectados. "
+                "Criando vídeo combinado..."
+            )
+
             video_combinado = criar_video_com_foto(video, fotos)
 
             if video_combinado:
@@ -407,21 +462,52 @@ if __name__ == "__main__":
             else:
                 print("⚠️ Montagem falhou. Usando vídeo original.")
 
-        print(f"🚀 Publicando oferta: {texto_bruto_oferta[:60]}...")
-        ok_tg = enviar_telegram(texto, fotos, video_ref=video_para_publicar)
+        print(
+            f"🚀 Publicando oferta: "
+            f"{texto_bruto_oferta[:60]}..."
+        )
 
-        paginas_alvo = set(["PROMONOMIA_OFERTAS"] + categorias_detectadas)
+        ok_tg = enviar_telegram(
+            texto,
+            fotos,
+            video_ref=video_para_publicar
+        )
+
+        paginas_alvo = set(
+            ["PROMONOMIA_OFERTAS"] + categorias_detectadas
+        )
 
         sucesso_geral = False
+
         for cat in paginas_alvo:
-            ok_fb = enviar_facebook(texto, link, foto_principal, video_url=video_para_publicar, categoria=cat)
+            ok_fb = enviar_facebook(
+                texto,
+                link,
+                foto_principal,
+                video_url=video_para_publicar,
+                categoria=cat
+            )
+
             if ok_fb:
                 sucesso_geral = True
 
         if ok_tg or sucesso_geral:
             remover_rascunho(proxima["id"])
-            print("✅ Oferta processada, publicada em todas as páginas correspondentes e removida com sucesso!")
+
+            print(
+                "✅ Oferta processada, publicada e removida "
+                "da fila com sucesso!"
+            )
+
         else:
-            print("❌ Falha ao publicar oferta.")
-    else:
-        print("📭 Fila de ofertas vazia.")
+            print(
+                "❌ Falha ao publicar oferta. "
+                "A oferta permanece na fila para nova tentativa."
+            )
+
+    except KeyboardInterrupt:
+        print("\n🛑 Worker encerrado.")
+
+    except Exception as e:
+        print(f"❌ Erro no worker: {e}")
+        exit(1)
