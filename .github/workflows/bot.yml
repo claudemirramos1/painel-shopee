@@ -25,6 +25,31 @@ jobs:
         python -m pip install --upgrade pip
         pip install requests google-genai Pillow
 
+    - name: Diagnóstico do ambiente
+      run: |
+        echo "===== DIAGNÓSTICO GITHUB ACTIONS ====="
+        echo "Commit: $GITHUB_SHA"
+        echo "Branch: $GITHUB_REF"
+        echo "Runner: $RUNNER_OS"
+        echo "Data UTC: $(date -u)"
+        echo "Python:"
+        python --version
+        echo "FFmpeg:"
+        if command -v ffmpeg >/dev/null 2>&1; then
+          which ffmpeg
+          ffmpeg -version | head -n 1
+        else
+          echo "FFmpeg NÃO ENCONTRADO"
+        fi
+        echo "FFprobe:"
+        if command -v ffprobe >/dev/null 2>&1; then
+          which ffprobe
+          ffprobe -version | head -n 1
+        else
+          echo "FFprobe NÃO ENCONTRADO"
+        fi
+        echo "===================================="
+
     - name: Run Product/Telegram Bot
       env:
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
