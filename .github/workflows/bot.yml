@@ -50,6 +50,13 @@ jobs:
         fi
         echo "===================================="
 
+      - name: Instalar FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
+
     - name: Run Product/Telegram Bot
       env:
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
