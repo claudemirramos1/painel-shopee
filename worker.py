@@ -384,130 +384,130 @@ def enviar_facebook(texto, link, imagem_url=None, video_url=None, categoria="PRO
 if __name__ == "__main__":
     INTERVALO_MINUTOS = 15
 
-    print("🤖 Worker iniciado.")
+    print("🤖 Worker contínuo iniciado.")
     print(f"⏱️ Intervalo entre publicações: {INTERVALO_MINUTOS} minutos")
 
-    try:
-        rascunhos = carregar_rascunhos()
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json"
+    }
 
-        if not rascunhos:
-            print("📭 Fila de ofertas vazia. Encerrando execução.")
-            exit(0)
+    url_controle = (
+        f"{SUPABASE_URL.rsplit('/ofertas', 1)[0]}"
+        "/rest/v1/rpc/tentar_reservar_publicacao"
+    )
 
-        headers = {
-            "apikey": SUPABASE_KEY,
-            "Authorization": f"Bearer {SUPABASE_KEY}",
-            "Content-Type": "application/json"
-        }
+    while True:
+        try:
+            rascunhos = carregar_rascunhos()
 
-        url_controle = (
-            f"{SUPABASE_URL.rsplit('/ofertas', 1)[0]}"
-            "/rest/v1/rpc/tentar_reservar_publicacao"
-        )
+            if not rascunhos:
+                print("📭 Fila vazia. Aguardando 30 segundos...")
+                time.sleep(30)
+                continue
 
-        resposta_reserva = requests.post(
-            url_controle,
-            headers=headers,
-            json={},
-            timeout=20
-        )
-
-        if resposta_reserva.status_code != 200:
-            print(
-                f"❌ Erro ao verificar intervalo de publicação: "
-                f"{resposta_reserva.status_code} - {resposta_reserva.text}"
-            )
-            exit(1)
-
-        pode_publicar = resposta_reserva.json()
-
-        if not pode_publicar:
-            print(
-                "⏳ Ainda não passaram 15 minutos desde a última "
-                "reserva/publicação. Encerrando execução."
-            )
-            exit(0)
-
-        proxima = rascunhos[0]
-
-        texto_bruto_oferta = (
-            proxima.get("titulo")
-            or proxima.get("formatado")
-            or ""
-        )
-
-        categorias_detectadas = classificar_oferta_gemini(
-            texto_bruto_oferta
-        )
-
-        texto, link = obter_texto_anuncio(proxima)
-
-        fotos = obter_fotos_lista(proxima)
-        foto_principal = fotos[0] if fotos else None
-
-        video = proxima.get("video")
-
-        video_para_publicar = video
-
-        if video and fotos:
-            print(
-                f"🎬 Vídeo + {len(fotos)} foto(s) detectados. "
-                "Criando vídeo combinado..."
+            resposta_reserva = requests.post(
+                url_controle,
+                headers=headers,
+                json={},
+                timeout=20
             )
 
-            video_combinado = criar_video_com_foto(video, fotos)
+            if resposta_reserva.status_code != 200:
+                print(
+                    f"❌ Erro ao verificar intervalo de publicação: "
+                    f"{resposta_reserva.status_code} - {resposta_reserva.text}"
+                )
+                time.sleep(30)
+                continue
 
-            if video_combinado:
-                video_para_publicar = video_combinado
-            else:
-                print("⚠️ Montagem falhou. Usando vídeo original.")
+            pode_publicar = resposta_reserva.json()
 
-        print(
-            f"🚀 Publicando oferta: "
-            f"{texto_bruto_oferta[:60]}..."
-        )
+            if not pode_publicar:
+                print("⏳ Intervalo de 15 minutos ainda não completado. Aguardando 30 segundos...")
+                time.sleep(30)
+                continue
 
-        ok_tg = enviar_telegram(
-            texto,
-            fotos,
-            video_ref=video_para_publicar
-        )
+            proxima = rascunhos[0]
 
-        paginas_alvo = set(
-            ["PROMONOMIA_OFERTAS"] + categorias_detectadas
-        )
+            texto_bruto_oferta = (
+                proxima.get("titulo")
+                or proxima.get("formatado")
+                or ""
+            )
 
-        sucesso_geral = False
+            categorias_detectadas = classificar_oferta_gemini(
+                texto_bruto_oferta
+            )
 
-        for cat in paginas_alvo:
-            ok_fb = enviar_facebook(
+            texto, link = obter_texto_anuncio(proxima)
+            fotos = obter_fotos_lista(proxima)
+            foto_principal = fotos[0] if fotos else None
+
+            video = proxima.get("video")
+            video_para_publicar = video
+
+            if video and fotos:
+                print(
+                    f"🎬 Vídeo + {len(fotos)} foto(s) detectados. "
+                    "Criando vídeo combinado..."
+                )
+
+                video_combinado = criar_video_com_foto(video, fotos)
+
+                if video_combinado:
+                    video_para_publicar = video_combinado
+                else:
+                    print("⚠️ Montagem falhou. Usando vídeo original.")
+
+            print(
+                f"🚀 Publicando oferta: "
+                f"{texto_bruto_oferta[:60]}..."
+            )
+
+            ok_tg = enviar_telegram(
                 texto,
-                link,
-                foto_principal,
-                video_url=video_para_publicar,
-                categoria=cat
+                fotos,
+                video_ref=video_para_publicar
             )
 
-            if ok_fb:
-                sucesso_geral = True
-
-        if ok_tg or sucesso_geral:
-            remover_rascunho(proxima["id"])
-
-            print(
-                "✅ Oferta processada, publicada e removida "
-                "da fila com sucesso!"
+            paginas_alvo = set(
+                ["PROMONOMIA_OFERTAS"] + categorias_detectadas
             )
 
-        else:
-            print(
-                "❌ Falha ao publicar oferta. "
-                "A oferta permanece na fila para nova tentativa."
-            )
+            sucesso_geral = False
 
-    except KeyboardInterrupt:
-        print("\n🛑 Worker encerrado.")
+            for cat in paginas_alvo:
+                ok_fb = enviar_facebook(
+                    texto,
+                    link,
+                    foto_principal,
+                    video_url=video_para_publicar,
+                    categoria=cat
+                )
 
-    except Exception as e:
-        print(f"❌ Erro no worker: {e}")
-        exit(1)
+                if ok_fb:
+                    sucesso_geral = True
+
+            if ok_tg or sucesso_geral:
+                remover_rascunho(proxima["id"])
+                print(
+                    "✅ Oferta processada, publicada e removida "
+                    "da fila com sucesso!"
+                )
+            else:
+                print(
+                    "❌ Falha ao publicar oferta. "
+                    "A oferta permanece na fila para nova tentativa."
+                )
+                time.sleep(60)
+
+        except KeyboardInterrupt:
+            print("\n🛑 Worker encerrado.")
+            break
+
+        except Exception as e:
+            print(f"❌ Erro no worker: {e}")
+            time.sleep(60)
+
