@@ -252,7 +252,7 @@ def juntar_video_foto(
                     "channel_layouts=stereo,"
                     f"atrim=duration={duracao_total_fotos},"
                     "asetpts=PTS-STARTPTS,"
-                    f"afade=t=out:st={max(0, duracao_total_fotos - 1)}:d=1"
+                    f"afade=t=in:st=0:d=2," "afade=t=out:st={max(0, duracao_total_fotos - 1)}:d=1"
                 ),
                 "-t", str(duracao_total_fotos),
                 "-ac", "2",
