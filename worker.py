@@ -386,8 +386,8 @@ if __name__ == "__main__":
 
     print("🤖 Worker contínuo iniciado.")
     import shutil
-    print(f"🔎 FFPROBE: {shutil.which("ffprobe") or "NÃO ENCONTRADO"}")
-    print(f"🔎 FFMPEG: {shutil.which("ffmpeg") or "NÃO ENCONTRADO"}")
+    print(f"🔎 FFPROBE: {shutil.which('ffprobe') or 'NÃO ENCONTRADO'}")
+    print(f"🔎 FFMPEG: {shutil.which('ffmpeg') or 'NÃO ENCONTRADO'}")
     print(f"⏱️ Intervalo entre publicações: {INTERVALO_MINUTOS} minutos")
 
     headers = {
