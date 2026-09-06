@@ -4,41 +4,45 @@ import io
 import re
 import time
 import tempfile
+from pathlib import Path
 import requests
+from dotenv import load_dotenv
 from PIL import Image, ImageOps
 from google import genai
 from juntar_video_foto import juntar_video_foto
 
-SUPABASE_URL = "https://ftumdeqziwyljmaehaqk.supabase.co"
-SUPABASE_KEY = "sb_publishable_8qfsBhW22Sx25mvPcxWNvw_4teJRbfu"
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
-TELEGRAM_CANAL_TOKEN = "8353706833:AAHhyPqgeNezFY1X4NTMegpaPf_UdVOBs04"
-TELEGRAM_CANAL_ID = "-1004406728710"
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip()
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "").strip()
+
+TELEGRAM_CANAL_TOKEN = os.getenv("TELEGRAM_CANAL_TOKEN", "").strip()
+TELEGRAM_CANAL_ID = os.getenv("TELEGRAM_CANAL_ID", "").strip()
 
 PAGINAS_DESTINO = {
     "BEBE_INFANTIL": {
-        "id": "1214563361750206",
-        "token": "EAAPFihJ9FJcBSdespc7VwtM9EyGZCm7CbRoPJ94WLZBZBsSXZAZBkjwtstxV4x0laEifWI26akmjosi883ZCAT7XPbQcnC5ONRPoaFH1aE6oXHUp5cvO1IHrZCoy09ZAp64M9uy3LNeNgIFsiajXDa83NGYKeyGdZBZBE5FS2xDiffRjOLzrMjtyj2pEXKPRfHEnGYZBpKA"
+        "id": os.getenv("FB_BEBE_INFANTIL_ID", "").strip(),
+        "token": os.getenv("FB_BEBE_INFANTIL_TOKEN", "").strip()
     },
     "AUTOMOTIVO": {
-        "id": "1237238682815031",
-        "token": "EAAPFihJ9FJcBSTc9xPtGPFIzMOvSowsCwYCYtYGhGbFGAwcGzQZBVxD12CzfD07QYeOL2NUo60iZCc8VaLe5kaNdvb4ucQaZB6bjz9p3JDZAswXW6V65efdBROok7wuc5hWC0fZBxTaTAWFmT5ECY4kwufZAZCiEjqFQBR8ocKvZBn4ZAmAVjjMZA5pzrZA8Qb4nCsi6SF3DWIu"
+        "id": os.getenv("FB_AUTOMOTIVO_ID", "").strip(),
+        "token": os.getenv("FB_AUTOMOTIVO_TOKEN", "").strip()
     },
     "MODA_FEMININA": {
-        "id": "1354603781059423",
-        "token": "EAAPFihJ9FJcBSSRyA7r1ZBp8XjDpZBZCI5kbBZCrhP9twlHOyLuNYRhqrA9KS50Wal5O4ZAg6baAl8O5VPT0gFhSNdBynMLsnflcSekcRIt6FrOeQJ90mJHqxlI0BmlEOXlWASWprE54LdARYpPr8SnDXVpXqGCncZC96gqvu7JlWJeXo7AwYDWr3FQk44gvwxNo0n"
+        "id": os.getenv("FB_MODA_FEMININA_ID", "").strip(),
+        "token": os.getenv("FB_MODA_FEMININA_TOKEN", "").strip()
     },
     "MODA_MASCULINA": {
-        "id": "1226863517186687",
-        "token": "EAAPFihJ9FJcBSXdZAf6qETU3aSuzE0VtVWtffFYrlCglPmyTnQtAQb5zKkohioKuqBztbXOZCUDvZAbv2ihkF4foVGW7KhvAIvBMvqqNZAEKjxLwllCNRwGU0xSJf2aW7OdpOTSS1vcCSqU1yy4Fx7zEz8EoL0vhPyKwbSXNgSq3GqPVUnqcTf1dm1k9ij5DFlwF"
+        "id": os.getenv("FB_MODA_MASCULINA_ID", "").strip(),
+        "token": os.getenv("FB_MODA_MASCULINA_TOKEN", "").strip()
     },
     "ELETRONICOS": {
-        "id": "1330088230179474",
-        "token": "EAAPFihJ9FJcBSbcBsbl9WoqGztGBiGaJi9ORgJmUMoLpZCGD5BFp2qbZA3mC1kcyZCJVQ32ldZCLYACpQ5DSuh4mmKdWtOAdUuRzoImnbooiSVS3t56EnY9jqdguUlN6TQlNPq9kL4RU3OoEBR5zP0JUg9Uu4BkSgcYRQtmRqLg3Tb0z9d2ZBhLfUfZAHGvR6PpFr9mZCk6"
+        "id": os.getenv("FB_ELETRONICOS_ID", "").strip(),
+        "token": os.getenv("FB_ELETRONICOS_TOKEN", "").strip()
     },
     "PROMONOMIA_OFERTAS": {
-        "id": "1214303865109377",
-        "token": "EAAPFihJ9FJcBSWSZBdne8dP0ngvvIbl91jPCzrVi7Ub7HdOIMK6guYcr3ZAA58x2ppYVZBSuwZC9IMx1wMPpBKyAtTkSz5uqi8O4B6VCGKa943WRBVclQNizD2gbKUkckX5TIU3KonoYk7ecTwTpuZARrXd5m1ur14hxYf5qGjNYOw8L53ELcVqdCPr5jFeZCfC7w1dZAst"
+        "id": os.getenv("FB_PROMONOMIA_OFERTAS_ID", "").strip(),
+        "token": os.getenv("FB_PROMONOMIA_OFERTAS_TOKEN", "").strip()
     }
 }
 
@@ -263,9 +267,41 @@ def criar_video_com_foto(video_url, fotos_urls):
         print(f"❌ Erro ao criar vídeo combinado: {e}")
         return None
 
+def preparar_texto_telegram(texto):
+    import re
+
+    texto = re.sub(
+        r'\[([^\]]+)\]\((https?://[^)]+)\)',
+        lambda m: f'<a href="{m.group(2)}">{m.group(1)}</a>',
+        texto
+    )
+
+    texto = re.sub(
+        r'\*\*(.*?)\*\*',
+        r'<b>\1</b>',
+        texto
+    )
+
+    return texto
+
+
+def preparar_texto_facebook(texto):
+    import re
+
+    texto = re.sub(
+        r'\[([^\]]+)\]\((https?://[^)]+)\)',
+        r'\1',
+        texto
+    )
+    texto = texto.replace("**", "")
+    return texto
+
+
 def enviar_telegram(texto, imagens_ref, video_ref=None):
     if not TELEGRAM_CANAL_TOKEN or not TELEGRAM_CANAL_ID: return False
     try:
+        texto_telegram = preparar_texto_telegram(texto)
+
         if video_ref:
             video_data = processar_video(video_ref)
 
@@ -275,8 +311,8 @@ def enviar_telegram(texto, imagens_ref, video_ref=None):
                     url,
                     data={
                         "chat_id": TELEGRAM_CANAL_ID,
-                        "caption": texto,
-                        "parse_mode": "Markdown"
+                        "caption": texto_telegram,
+                        "parse_mode": "HTML"
                     },
                     files={
                         "video": ("video.mp4", video_data, "video/mp4")
@@ -298,7 +334,7 @@ def enviar_telegram(texto, imagens_ref, video_ref=None):
 
         if not imagens_ref:
             url = f"https://api.telegram.org/bot{TELEGRAM_CANAL_TOKEN}/sendMessage"
-            r = requests.post(url, data={'chat_id': TELEGRAM_CANAL_ID, 'text': texto, 'parse_mode': 'Markdown'}, timeout=30)
+            r = requests.post(url, data={'chat_id': TELEGRAM_CANAL_ID, 'text': texto_telegram, 'parse_mode': 'HTML'}, timeout=30)
             return r.json().get("ok", False)
         if isinstance(imagens_ref, str): imagens_ref = [imagens_ref]
         midia_processada, files_dict = [], {}
@@ -309,8 +345,8 @@ def enviar_telegram(texto, imagens_ref, video_ref=None):
                 files_dict[file_key] = ('foto.jpg', img_io.getvalue(), 'image/jpeg')
                 item_midia = {"type": "photo", "media": f"attach://{file_key}"}
                 if i == 0 and texto:
-                    item_midia["caption"] = texto
-                    item_midia["parse_mode"] = "Markdown"
+                    item_midia["caption"] = texto_telegram
+                    item_midia["parse_mode"] = "HTML"
                 midia_processada.append(item_midia)
         if len(midia_processada) > 1:
             url = f"https://api.telegram.org/bot{TELEGRAM_CANAL_TOKEN}/sendMediaGroup"
@@ -318,10 +354,11 @@ def enviar_telegram(texto, imagens_ref, video_ref=None):
             return r.json().get("ok", False)
         elif len(midia_processada) == 1:
             url = f"https://api.telegram.org/bot{TELEGRAM_CANAL_TOKEN}/sendPhoto"
-            r = requests.post(url, data={'chat_id': TELEGRAM_CANAL_ID, 'caption': texto, 'parse_mode': 'Markdown'}, files={'photo': files_dict['photo_0']}, timeout=30)
+            r = requests.post(url, data={'chat_id': TELEGRAM_CANAL_ID, 'caption': texto_telegram, 'parse_mode': 'HTML'}, files={'photo': files_dict['photo_0']}, timeout=30)
             return r.json().get("ok", False)
         return False
-    except:
+    except Exception as e:
+        print(f"❌ EXCEÇÃO NO TELEGRAM: {type(e).__name__}: {e}")
         return False
 
 def enviar_facebook(texto, link, imagem_url=None, video_url=None, categoria="PROMONOMIA_OFERTAS"):
@@ -331,7 +368,7 @@ def enviar_facebook(texto, link, imagem_url=None, video_url=None, categoria="PRO
 
     if not page_id or not access_token: return False
     try:
-        legenda = texto.replace("**", "*")
+        legenda = preparar_texto_facebook(texto)
 
         if video_url:
             video_data = processar_video(video_url)
@@ -341,7 +378,7 @@ def enviar_facebook(texto, link, imagem_url=None, video_url=None, categoria="PRO
                 r = requests.post(
                     url,
                     data={
-                        "description": legenda,
+                        "description": legenda + (f"\n\n🔗 {link}" if link and link not in legenda else ""),
                         "access_token": access_token
                     },
                     files={

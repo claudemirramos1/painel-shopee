@@ -4,3 +4,4 @@ streamlit-drawable-canvas
 supabase
 requests
 pillow
+python-dotenv
