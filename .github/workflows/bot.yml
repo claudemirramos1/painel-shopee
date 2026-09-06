@@ -1,88 +1,21 @@
 name: Bot Automation Suite
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
-  schedule:
-    - cron: '*/15 * * * *'
 
 jobs:
-  run-bots:
+  verificar-repositorio:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-
-      - name: Install dependencies
+      - name: Verificar arquivos
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Diagnóstico do ambiente
-        run: |
-          echo "===== DIAGNÓSTICO GITHUB ACTIONS ====="
+          echo "===== REPOSITÓRIO ====="
           echo "Commit: $GITHUB_SHA"
           echo "Branch: $GITHUB_REF"
-          echo "Runner: $RUNNER_OS"
-          echo "Data UTC: $(date -u)"
           echo "Python:"
           python --version
-          echo "FFmpeg:"
-          if command -v ffmpeg >/dev/null 2>&1; then
-            which ffmpeg
-            ffmpeg -version | head -n 1
-          else
-            echo "FFmpeg NÃO ENCONTRADO"
-          fi
-          echo "FFprobe:"
-          if command -v ffprobe >/dev/null 2>&1; then
-            which ffprobe
-            ffprobe -version | head -n 1
-          else
-            echo "FFprobe NÃO ENCONTRADO"
-          fi
-          echo "===================================="
-
-      - name: Instalar FFmpeg
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
-          ffmpeg -version | head -n 1
-          ffprobe -version | head -n 1
-
-      - name: Run Worker
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          TELEGRAM_CANAL_TOKEN: ${{ secrets.TELEGRAM_CANAL_TOKEN }}
-          TELEGRAM_CANAL_ID: ${{ secrets.TELEGRAM_CANAL_ID }}
-
-          FB_BEBE_INFANTIL_ID: ${{ secrets.FB_BEBE_INFANTIL_ID }}
-          FB_BEBE_INFANTIL_TOKEN: ${{ secrets.FB_BEBE_INFANTIL_TOKEN }}
-
-          FB_AUTOMOTIVO_ID: ${{ secrets.FB_AUTOMOTIVO_ID }}
-          FB_AUTOMOTIVO_TOKEN: ${{ secrets.FB_AUTOMOTIVO_TOKEN }}
-
-          FB_MODA_FEMININA_ID: ${{ secrets.FB_MODA_FEMININA_ID }}
-          FB_MODA_FEMININA_TOKEN: ${{ secrets.FB_MODA_FEMININA_TOKEN }}
-
-          FB_MODA_MASCULINA_ID: ${{ secrets.FB_MODA_MASCULINA_ID }}
-          FB_MODA_MASCULINA_TOKEN: ${{ secrets.FB_MODA_MASCULINA_TOKEN }}
-
-          FB_ELETRONICOS_ID: ${{ secrets.FB_ELETRONICOS_ID }}
-          FB_ELETRONICOS_TOKEN: ${{ secrets.FB_ELETRONICOS_TOKEN }}
-
-          FB_PROMONOMIA_OFERTAS_ID: ${{ secrets.FB_PROMONOMIA_OFERTAS_ID }}
-          FB_PROMONOMIA_OFERTAS_TOKEN: ${{ secrets.FB_PROMONOMIA_OFERTAS_TOKEN }}
-
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-
-        run: |
-          python worker.py
+          echo "======================="
