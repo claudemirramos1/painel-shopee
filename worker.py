@@ -3,46 +3,40 @@ import json
 import io
 import re
 import time
-import tempfile
-from pathlib import Path
 import requests
-from dotenv import load_dotenv
 from PIL import Image, ImageOps
 from google import genai
-from juntar_video_foto import juntar_video_foto
 
-load_dotenv(Path(__file__).resolve().parent / ".env")
+SUPABASE_URL = "https://ftumdeqziwyljmaehaqk.supabase.co"
+SUPABASE_KEY = "sb_publishable_8qfsBhW22Sx25mvPcxWNvw_4teJRbfu"
 
-SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip()
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "").strip()
-
-TELEGRAM_CANAL_TOKEN = os.getenv("TELEGRAM_CANAL_TOKEN", "").strip()
-TELEGRAM_CANAL_ID = os.getenv("TELEGRAM_CANAL_ID", "").strip()
+TELEGRAM_CANAL_TOKEN = "8353706833:AAHhyPqgeNezFY1X4NTMegpaPf_UdVOBs04"
+TELEGRAM_CANAL_ID = "-1004406728710"
 
 PAGINAS_DESTINO = {
     "BEBE_INFANTIL": {
-        "id": os.getenv("FB_BEBE_INFANTIL_ID", "").strip(),
-        "token": os.getenv("FB_BEBE_INFANTIL_TOKEN", "").strip()
+        "id": "1214563361750206",
+        "token": "EAAPFihJ9FJcBSdespc7VwtM9EyGZCm7CbRoPJ94WLZBZBsSXZAZBkjwtstxV4x0laEifWI26akmjosi883ZCAT7XPbQcnC5ONRPoaFH1aE6oXHUp5cvO1IHrZCoy09ZAp64M9uy3LNeNgIFsiajXDa83NGYKeyGdZBZBE5FS2xDiffRjOLzrMjtyj2pEXKPRfHEnGYZBpKA"
     },
     "AUTOMOTIVO": {
-        "id": os.getenv("FB_AUTOMOTIVO_ID", "").strip(),
-        "token": os.getenv("FB_AUTOMOTIVO_TOKEN", "").strip()
+        "id": "1237238682815031",
+        "token": "EAAPFihJ9FJcBSTc9xPtGPFIzMOvSowsCwYCYtYGhGbFGAwcGzQZBVxD12CzfD07QYeOL2NUo60iZCc8VaLe5kaNdvb4ucQaZB6bjz9p3JDZAswXW6V65efdBROok7wuc5hWC0fZBxTaTAWFmT5ECY4kwufZAZCiEjqFQBR8ocKvZBn4ZAmAVjjMZA5pzrZA8Qb4nCsi6SF3DWIu"
     },
     "MODA_FEMININA": {
-        "id": os.getenv("FB_MODA_FEMININA_ID", "").strip(),
-        "token": os.getenv("FB_MODA_FEMININA_TOKEN", "").strip()
+        "id": "1354603781059423",
+        "token": "EAAPFihJ9FJcBSSRyA7r1ZBp8XjDpZBZCI5kbBZCrhP9twlHOyLuNYRhqrA9KS50Wal5O4ZAg6baAl8O5VPT0gFhSNdBynMLsnflcSekcRIt6FrOeQJ90mJHqxlI0BmlEOXlWASWprE54LdARYpPr8SnDXVpXqGCncZC96gqvu7JlWJeXo7AwYDWr3FQk44gvwxNo0n"
     },
     "MODA_MASCULINA": {
-        "id": os.getenv("FB_MODA_MASCULINA_ID", "").strip(),
-        "token": os.getenv("FB_MODA_MASCULINA_TOKEN", "").strip()
+        "id": "1226863517186687",
+        "token": "EAAPFihJ9FJcBSXdZAf6qETU3aSuzE0VtVWtffFYrlCglPmyTnQtAQb5zKkohioKuqBztbXOZCUDvZAbv2ihkF4foVGW7KhvAIvBMvqqNZAEKjxLwllCNRwGU0xSJf2aW7OdpOTSS1vcCSqU1yy4Fx7zEz8EoL0vhPyKwbSXNgSq3GqPVUnqcTf1dm1k9ij5DFlwF"
     },
     "ELETRONICOS": {
-        "id": os.getenv("FB_ELETRONICOS_ID", "").strip(),
-        "token": os.getenv("FB_ELETRONICOS_TOKEN", "").strip()
+        "id": "1330088230179474",
+        "token": "EAAPFihJ9FJcBSbcBsbl9WoqGztGBiGaJi9ORgJmUMoLpZCGD5BFp2qbZA3mC1kcyZCJVQ32ldZCLYACpQ5DSuh4mmKdWtOAdUuRzoImnbooiSVS3t56EnY9jqdguUlN6TQlNPq9kL4RU3OoEBR5zP0JUg9Uu4BkSgcYRQtmRqLg3Tb0z9d2ZBhLfUfZAHGvR6PpFr9mZCk6"
     },
     "PROMONOMIA_OFERTAS": {
-        "id": os.getenv("FB_PROMONOMIA_OFERTAS_ID", "").strip(),
-        "token": os.getenv("FB_PROMONOMIA_OFERTAS_TOKEN", "").strip()
+        "id": "1214303865109377",
+        "token": "EAAPFihJ9FJcBSWSZBdne8dP0ngvvIbl91jPCzrVi7Ub7HdOIMK6guYcr3ZAA58x2ppYVZBSuwZC9IMx1wMPpBKyAtTkSz5uqi8O4B6VCGKa943WRBVclQNizD2gbKUkckX5TIU3KonoYk7ecTwTpuZARrXd5m1ur14hxYf5qGjNYOw8L53ELcVqdCPr5jFeZCfC7w1dZAst"
     }
 }
 
@@ -70,7 +64,7 @@ def remover_rascunho(rascunho_id):
 def classificar_por_palavras_chave(texto):
     texto_lower = texto.lower()
     categorias_encontradas = []
-
+    
     if any(k in texto_lower for k in ["infantil", "bebe", "nenem", "crianca", "brinquedo", "chupeta", "fralda", "maternidade", "carrinho de bebe"]):
         categorias_encontradas.append("BEBE_INFANTIL")
     if any(k in texto_lower for k in ["carro", "moto", "automotivo", "veiculo", "pneu", "retrovisor", "farol", "volante", "tapete automotivo"]):
@@ -81,14 +75,14 @@ def classificar_por_palavras_chave(texto):
         categorias_encontradas.append("MODA_FEMININA")
     if any(k in texto_lower for k in ["masculina", "bermuda", "calca jeans", "camisa polo", "tenis masculino", "carteira masculina"]):
         categorias_encontradas.append("MODA_MASCULINA")
-
+        
     return categorias_encontradas if categorias_encontradas else ["PROMONOMIA_OFERTAS"]
 
 def classificar_oferta_gemini(texto_post):
     GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
     if not GEMINI_API_KEY:
         return classificar_por_palavras_chave(texto_post)
-
+        
     tentativas = 3
     for tentativa in range(1, tentativas + 1):
         try:
@@ -104,10 +98,10 @@ def classificar_oferta_gemini(texto_post):
             """
             response = client.chats.create(model="gemini-3.6-flash").send_message(prompt)
             resposta_texto = response.text.strip().upper().replace(".", "")
-
+            
             candidatas = [c.strip() for c in resposta_texto.split(",")]
             cats_validas = [c for c in candidatas if c in PAGINAS_DESTINO]
-
+            
             if cats_validas:
                 print(f"🎯 Categorias identificadas pela IA: {cats_validas}")
                 return cats_validas
@@ -115,7 +109,7 @@ def classificar_oferta_gemini(texto_post):
             print(f"⚠️ Tentativa {tentativa}/{tentativas} - Erro na IA Gemini: {e}")
             if tentativa < tentativas:
                 time.sleep(2)
-
+            
     print("⚠️ Falha na IA após 3 tentativas. Acionando fallback por palavras-chave...")
     return classificar_por_palavras_chave(texto_post)
 
@@ -185,13 +179,6 @@ def processar_imagem(img_url):
 
 def processar_video(video_url):
     try:
-        if isinstance(video_url, bytes):
-            return video_url
-
-        if os.path.isfile(video_url):
-            with open(video_url, "rb") as f:
-                return f.read()
-
         resp = requests.get(video_url, timeout=120)
         if resp.status_code != 200:
             print(f"❌ Erro ao baixar vídeo: HTTP {resp.status_code}")
@@ -203,105 +190,9 @@ def processar_video(video_url):
         return None
 
 
-def criar_video_com_foto(video_url, fotos_urls):
-    try:
-        if not video_url or not fotos_urls:
-            return None
-
-        pasta_temp = tempfile.mkdtemp(prefix="video_foto_")
-        video_original = os.path.join(pasta_temp, "video_original.mp4")
-        fotos_originais = []
-
-        print("⬇️ Baixando vídeo para montagem...")
-        video_data = processar_video(video_url)
-
-        if not video_data:
-            print("❌ Não foi possível baixar o vídeo para montagem.")
-            return None
-
-        with open(video_original, "wb") as f:
-            f.write(video_data)
-
-        for i, foto_url in enumerate(fotos_urls, 1):
-            print(f"⬇️ Baixando foto {i}/{len(fotos_urls)} para montagem...")
-            foto_data = processar_imagem(foto_url)
-
-            if not foto_data:
-                print(f"⚠️ Não foi possível baixar a foto {i}. Pulando...")
-                continue
-
-            foto_original = os.path.join(
-                pasta_temp,
-                f"foto_{i}.jpg"
-            )
-
-            with open(foto_original, "wb") as f:
-                f.write(foto_data.getvalue())
-
-            fotos_originais.append(foto_original)
-
-        if not fotos_originais:
-            print("❌ Nenhuma foto pôde ser baixada para a montagem.")
-            return None
-
-        video_final = os.path.join(pasta_temp, "video_final.mp4")
-
-        print(f"🎬 Montando vídeo + {len(fotos_originais)} foto(s)...")
-
-        juntar_video_foto(
-            video_original,
-            fotos_originais,
-            video_final
-        )
-
-        if not os.path.exists(video_final):
-            print("❌ O vídeo combinado não foi criado.")
-            return None
-
-        print("✅ Vídeo combinado criado com sucesso.")
-
-        with open(video_final, "rb") as f:
-            return f.read()
-
-    except Exception as e:
-        print(f"❌ Erro ao criar vídeo combinado: {e}")
-        return None
-
-def preparar_texto_telegram(texto):
-    import re
-
-    texto = re.sub(
-        r'\[([^\]]+)\]\((https?://[^)]+)\)',
-        lambda m: f'<a href="{m.group(2)}">{m.group(1)}</a>',
-        texto
-    )
-
-    texto = re.sub(
-        r'\*\*(.*?)\*\*',
-        r'<b>\1</b>',
-        texto
-    )
-
-    return texto
-
-
-def preparar_texto_facebook(texto):
-    import re
-
-    texto = re.sub(
-        r'\[([^\]]+)\]\((https?://[^)]+)\)',
-        r'\1',
-        texto
-    )
-    texto = texto.replace("**", "")
-    return texto
-
-
 def enviar_telegram(texto, imagens_ref, video_ref=None):
     if not TELEGRAM_CANAL_TOKEN or not TELEGRAM_CANAL_ID: return False
     try:
-        texto_telegram = preparar_texto_telegram(texto)
-
         if video_ref:
             video_data = processar_video(video_ref)
 
@@ -311,8 +202,8 @@ def enviar_telegram(texto, imagens_ref, video_ref=None):
                     url,
                     data={
                         "chat_id": TELEGRAM_CANAL_ID,
-                        "caption": texto_telegram,
-                        "parse_mode": "HTML"
+                        "caption": texto,
+                        "parse_mode": "Markdown"
                     },
                     files={
                         "video": ("video.mp4", video_data, "video/mp4")
@@ -334,7 +225,7 @@ def enviar_telegram(texto, imagens_ref, video_ref=None):
 
         if not imagens_ref:
             url = f"https://api.telegram.org/bot{TELEGRAM_CANAL_TOKEN}/sendMessage"
-            r = requests.post(url, data={'chat_id': TELEGRAM_CANAL_ID, 'text': texto_telegram, 'parse_mode': 'HTML'}, timeout=30)
+            r = requests.post(url, data={'chat_id': TELEGRAM_CANAL_ID, 'text': texto, 'parse_mode': 'Markdown'}, timeout=30)
             return r.json().get("ok", False)
         if isinstance(imagens_ref, str): imagens_ref = [imagens_ref]
         midia_processada, files_dict = [], {}
@@ -345,8 +236,8 @@ def enviar_telegram(texto, imagens_ref, video_ref=None):
                 files_dict[file_key] = ('foto.jpg', img_io.getvalue(), 'image/jpeg')
                 item_midia = {"type": "photo", "media": f"attach://{file_key}"}
                 if i == 0 and texto:
-                    item_midia["caption"] = texto_telegram
-                    item_midia["parse_mode"] = "HTML"
+                    item_midia["caption"] = texto
+                    item_midia["parse_mode"] = "Markdown"
                 midia_processada.append(item_midia)
         if len(midia_processada) > 1:
             url = f"https://api.telegram.org/bot{TELEGRAM_CANAL_TOKEN}/sendMediaGroup"
@@ -354,21 +245,20 @@ def enviar_telegram(texto, imagens_ref, video_ref=None):
             return r.json().get("ok", False)
         elif len(midia_processada) == 1:
             url = f"https://api.telegram.org/bot{TELEGRAM_CANAL_TOKEN}/sendPhoto"
-            r = requests.post(url, data={'chat_id': TELEGRAM_CANAL_ID, 'caption': texto_telegram, 'parse_mode': 'HTML'}, files={'photo': files_dict['photo_0']}, timeout=30)
+            r = requests.post(url, data={'chat_id': TELEGRAM_CANAL_ID, 'caption': texto, 'parse_mode': 'Markdown'}, files={'photo': files_dict['photo_0']}, timeout=30)
             return r.json().get("ok", False)
         return False
-    except Exception as e:
-        print(f"❌ EXCEÇÃO NO TELEGRAM: {type(e).__name__}: {e}")
+    except:
         return False
 
 def enviar_facebook(texto, link, imagem_url=None, video_url=None, categoria="PROMONOMIA_OFERTAS"):
     cfg = PAGINAS_DESTINO.get(categoria, PAGINAS_DESTINO["PROMONOMIA_OFERTAS"])
     page_id = cfg["id"]
     access_token = cfg["token"]
-
+    
     if not page_id or not access_token: return False
     try:
-        legenda = preparar_texto_facebook(texto)
+        legenda = texto.replace("**", "*")
 
         if video_url:
             video_data = processar_video(video_url)
@@ -378,7 +268,7 @@ def enviar_facebook(texto, link, imagem_url=None, video_url=None, categoria="PRO
                 r = requests.post(
                     url,
                     data={
-                        "description": legenda + (f"\n\n🔗 {link}" if link and link not in legenda else ""),
+                        "description": legenda,
                         "access_token": access_token
                     },
                     files={
@@ -418,136 +308,33 @@ def enviar_facebook(texto, link, imagem_url=None, video_url=None, categoria="PRO
         print(f"❌ Erro ao postar no Facebook ({categoria}): {e}")
         return False
 
-if __name__ == "__main__":
-    INTERVALO_MINUTOS = 15
+rascunhos = carregar_rascunhos()
+if rascunhos:
+    proxima = rascunhos[0]
+    texto_bruto_oferta = proxima.get('titulo') or proxima.get('formatado') or ""
+    
+    categorias_detectadas = classificar_oferta_gemini(texto_bruto_oferta)
+    
+    texto, link = obter_texto_anuncio(proxima)
+    fotos = obter_fotos_lista(proxima)
+    foto_principal = fotos[0] if fotos else None
+    video = proxima.get("video")
 
-    print("🤖 Worker contínuo iniciado.")
-    import shutil
-    print(f"🔎 FFPROBE: {shutil.which('ffprobe') or 'NÃO ENCONTRADO'}")
-    print(f"🔎 FFMPEG: {shutil.which('ffmpeg') or 'NÃO ENCONTRADO'}")
-    print(f"⏱️ Intervalo entre publicações: {INTERVALO_MINUTOS} minutos")
+    print(f"🚀 Publicando oferta: {texto_bruto_oferta[:60]}...")
+    ok_tg = enviar_telegram(texto, fotos, video_ref=video)
+    
+    paginas_alvo = set(["PROMONOMIA_OFERTAS"] + categorias_detectadas)
+    
+    sucesso_geral = False
+    for cat in paginas_alvo:
+        ok_fb = enviar_facebook(texto, link, foto_principal, video_url=video, categoria=cat)
+        if ok_fb:
+            sucesso_geral = True
 
-    headers = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json"
-    }
-
-    url_controle = (
-        f"{SUPABASE_URL.rsplit('/ofertas', 1)[0]}"
-        "/rest/v1/rpc/tentar_reservar_publicacao"
-    )
-
-    while True:
-        try:
-            rascunhos = carregar_rascunhos()
-
-            if not rascunhos:
-                print("📭 Fila vazia. Aguardando 30 segundos...")
-                time.sleep(30)
-                continue
-
-            resposta_reserva = requests.post(
-                url_controle,
-                headers=headers,
-                json={},
-                timeout=20
-            )
-
-            if resposta_reserva.status_code != 200:
-                print(
-                    f"❌ Erro ao verificar intervalo de publicação: "
-                    f"{resposta_reserva.status_code} - {resposta_reserva.text}"
-                )
-                time.sleep(30)
-                continue
-
-            pode_publicar = resposta_reserva.json()
-
-            if not pode_publicar:
-                print("⏳ Intervalo de 15 minutos ainda não completado. Aguardando 30 segundos...")
-                time.sleep(30)
-                continue
-
-            proxima = rascunhos[0]
-
-            texto_bruto_oferta = (
-                proxima.get("titulo")
-                or proxima.get("formatado")
-                or ""
-            )
-
-            categorias_detectadas = classificar_oferta_gemini(
-                texto_bruto_oferta
-            )
-
-            texto, link = obter_texto_anuncio(proxima)
-            fotos = obter_fotos_lista(proxima)
-            foto_principal = fotos[0] if fotos else None
-
-            video = proxima.get("video")
-            video_para_publicar = video
-
-            if video and fotos:
-                print(
-                    f"🎬 Vídeo + {len(fotos)} foto(s) detectados. "
-                    "Criando vídeo combinado..."
-                )
-
-                video_combinado = criar_video_com_foto(video, fotos)
-
-                if video_combinado:
-                    video_para_publicar = video_combinado
-                else:
-                    print("⚠️ Montagem falhou. Usando vídeo original.")
-
-            print(
-                f"🚀 Publicando oferta: "
-                f"{texto_bruto_oferta[:60]}..."
-            )
-
-            ok_tg = enviar_telegram(
-                texto,
-                fotos,
-                video_ref=video_para_publicar
-            )
-
-            paginas_alvo = set(
-                ["PROMONOMIA_OFERTAS"] + categorias_detectadas
-            )
-
-            sucesso_geral = False
-
-            for cat in paginas_alvo:
-                ok_fb = enviar_facebook(
-                    texto,
-                    link,
-                    foto_principal,
-                    video_url=video_para_publicar,
-                    categoria=cat
-                )
-
-                if ok_fb:
-                    sucesso_geral = True
-
-            if ok_tg or sucesso_geral:
-                remover_rascunho(proxima["id"])
-                print(
-                    "✅ Oferta processada, publicada e removida "
-                    "da fila com sucesso!"
-                )
-            else:
-                print(
-                    "❌ Falha ao publicar oferta. "
-                    "A oferta permanece na fila para nova tentativa."
-                )
-                time.sleep(60)
-
-        except KeyboardInterrupt:
-            print("\n🛑 Worker encerrado.")
-            break
-
-        except Exception as e:
-            print(f"❌ Erro no worker: {e}")
-            time.sleep(60)
-
+    if ok_tg or sucesso_geral:
+        remover_rascunho(proxima["id"])
+        print("✅ Oferta processada, publicada em todas as páginas correspondentes e removida com sucesso!")
+    else:
+        print("❌ Falha ao publicar oferta.")
+else:
+    print("📭 Fila de ofertas vazia.")
