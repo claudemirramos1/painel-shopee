@@ -1,85 +1,87 @@
-Nome : Conjunto de Automação de Bots
+name: Conjunto de Automação de Bots
 
-sobre :
-empurrar :
-ramos : [ principal ]
-workflow_dispatch :
-agendar :
-- cron : ' */15 * * * * '
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+  schedule:
+    - cron: '*/15 * * * *'
 
-empregos :
-n-bots :
-runs-on : ubuntu-latest
+jobs:
+  n-bots:
+    runs-on: ubuntu-latest
 
-passos :  
-  - nome : Repositório de checkout  
-    utiliza : actions/checkout@v4  
+    steps:
+      - name: Repositório de checkout  
+        uses: actions/checkout@v4  
 
-  - nome : Configurar Python  
-    usa : actions/setup-python@v5  
-    com :  
-      versão do python : ' 3.13 '  
+      - name: Configurar Python  
+        uses: actions/setup-python@v5  
+        with:  
+          python-version: '3.13'  
 
-  - nome : Instalar dependências  
-    executar : |  
-      python -m pip install --upgrade pip  
-      pip install -r requirements.txt  
-  - nome : Diagnóstico do ambiente  
-    executar : |  
-      echo "===== DIAGNÓSTICO AÇÕES DO GITHUB ====="  
-      echo "Commit: $GITHUB_SHA"  
-      echo "Branch: $GITHUB_REF"  
-      echo "Executor: $RUNNER_OS"  
-      echo "Data UTC: $(date -u)"  
-      eco "Python:"  
-      python --versão  
-      eco "FFmpeg:"  
-      se o comando -v ffmpeg >/dev/null 2>&1; então  
-        qual ffmpeg  
-        ffmpeg -versão | head -n 1  
-      outro  
-        eco "FFmpeg não foi encontrado"  
-      fi  
-      eco "FFprobe:"  
-      se o comando -v ffprobe >/dev/null 2>&1; então  
-        qual ffprobe  
-        ffprobe -versão | head -n 1  
-      outro  
-        echo "FFprobe NÃO ENCONTRADO"  
-      fi  
-      eco "==================================="  
-  - nome : Instalar FFmpeg  
-    executar : |  
-      sudo apt-get update  
-      sudo apt-get install -y ffmpeg  
-      ffmpeg -versão | head -n 1  
-      ffprobe -versão | head -n 1  
-  - nome : Executar Worker  
-    ambiente :  
-      SUPABASE_URL : ${{ secrets.SUPABASE_URL }}  
-      SUPABASE_KEY : ${{ secrets.SUPABASE_KEY }}  
-      TELEGRAM_CANAL_TOKEN : ${{ secrets.TELEGRAM_CANAL_TOKEN }}  
-      ID_DO_CANAL_DO_TELEGRAM : ${{ secrets.ID_DO_CANAL_DO_TELEGRAM }}  
+      - name: Instalar dependências  
+        run: |  
+          python -m pip install --upgrade pip  
+          pip install -r requirements.txt  
 
-      FB_BEBE_INFANTIL_ID : ${{ secrets.FB_BEBE_INFANTIL_ID }}  
-      FB_BEBE_INFANTIL_TOKEN : ${{ secrets.FB_BEBE_INFANTIL_TOKEN }}  
+      - name: Diagnóstico do ambiente  
+        run: |  
+          echo "===== DIAGNÓSTICO AÇÕES DO GITHUB ====="  
+          echo "Commit: $GITHUB_SHA"  
+          echo "Branch: $GITHUB_REF"  
+          echo "Executor: $RUNNER_OS"  
+          echo "Data UTC: $(date -u)"  
+          echo "Python:"  
+          python --version  
+          echo "FFmpeg:"  
+          if command -v ffmpeg >/dev/null 2>&1; then  
+            which ffmpeg  
+            ffmpeg -version | head -n 1  
+          else  
+            echo "FFmpeg não foi encontrado"  
+          fi  
+          echo "FFprobe:"  
+          if command -v ffprobe >/dev/null 2>&1; then  
+            which ffprobe  
+            ffprobe -version | head -n 1  
+          else  
+            echo "FFprobe NÃO ENCONTRADO"  
+          fi  
+          echo "==================================="  
 
-      FB_AUTOMOTIVO_ID : ${{ secrets.FB_AUTOMOTIVO_ID }}  
-      FB_AUTOMOTIVO_TOKEN : ${{ secrets.FB_AUTOMOTIVO_TOKEN }}  
+      - name: Instalar FFmpeg  
+        run: |  
+          sudo apt-get update  
+          sudo apt-get install -y ffmpeg  
+          ffmpeg -version | head -n 1  
+          ffprobe -version | head -n 1  
 
-      FB_MODA_FEMININA_ID : ${{ secrets.FB_MODA_FEMININA_ID }}  
-      FB_MODA_FEMININA_TOKEN : ${{ secrets.FB_MODA_FEMININA_TOKEN }}  
+      - name: Executar Worker  
+        env:  
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}  
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}  
+          TELEGRAM_CANAL_TOKEN: ${{ secrets.TELEGRAM_CANAL_TOKEN }}  
+          ID_DO_CANAL_DO_TELEGRAM: ${{ secrets.ID_DO_CANAL_DO_TELEGRAM }}  
 
-      FB_MODA_MASCULINA_ID : ${{ secrets.FB_MODA_MASCULINA_ID }}  
-      FB_MODA_MASCULINA_TOKEN : ${{ secrets.FB_MODA_MASCULINA_TOKEN }}  
+          FB_BEBE_INFANTIL_ID: ${{ secrets.FB_BEBE_INFANTIL_ID }}  
+          FB_BEBE_INFANTIL_TOKEN: ${{ secrets.FB_BEBE_INFANTIL_TOKEN }}  
 
-      FB_ELETRONICOS_ID : ${{ secrets.FB_ELETRONICOS_ID }}  
-      FB_ELETRONICOS_TOKEN : ${{ secrets.FB_ELETRONICOS_TOKEN }}  
+          FB_AUTOMOTIVO_ID: ${{ secrets.FB_AUTOMOTIVO_ID }}  
+          FB_AUTOMOTIVO_TOKEN: ${{ secrets.FB_AUTOMOTIVO_TOKEN }}  
 
-      FB_PROMONOMIA_OFERTAS_ID : ${{ secrets.FB_PROMONOMIA_OFERTAS_ID }}  
-      FB_PROMONOMIA_OFERTAS_TOKEN : ${{ secrets.FB_PROMONOMIA_OFERTAS_TOKEN }}  
+          FB_MODA_FEMININA_ID: ${{ secrets.FB_MODA_FEMININA_ID }}  
+          FB_MODA_FEMININA_TOKEN: ${{ secrets.FB_MODA_FEMININA_TOKEN }}  
 
-      GEMINI_API_KEY : ${{ secrets.GEMINI_API_KEY }}  
+          FB_MODA_MASCULINA_ID: ${{ secrets.FB_MODA_MASCULINA_ID }}  
+          FB_MODA_MASCULINA_TOKEN: ${{ secrets.FB_MODA_MASCULINA_TOKEN }}  
 
-    executar : |  
-      python worker.py
+          FB_ELETRONICOS_ID: ${{ secrets.FB_ELETRONICOS_ID }}  
+          FB_ELETRONICOS_TOKEN: ${{ secrets.FB_ELETRONICOS_TOKEN }}  
+
+          FB_PROMONOMIA_OFERTAS_ID: ${{ secrets.FB_PROMONOMIA_OFERTAS_ID }}  
+          FB_PROMONOMIA_OFERTAS_TOKEN: ${{ secrets.FB_PROMONOMIA_OFERTAS_TOKEN }}  
+
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}  
+        run: |  
+          python worker.py
