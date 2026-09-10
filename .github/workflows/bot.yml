@@ -1,11 +1,9 @@
-name: Conjunto de Automação de Bots
-
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+
   workflow_dispatch:
-  schedule:
-    - cron: '*/15 * * * *'
 
 jobs:
   n-bots:
